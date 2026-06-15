@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "Britishce44 Mobile",
+    "slug": "britishce44-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "britishce44-mobile",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#080f22"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.replit.britishce44mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Britishce44 needs camera access to participate in live classroom video sessions.",
+        "NSMicrophoneUsageDescription": "Britishce44 needs microphone access to speak in live classroom sessions."
+      }
+    },
+    "android": {
+      "package": "com.replit.britishce44mobile",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "RECEIVE_BOOT_COMPLETED",
+        "SCHEDULE_EXACT_ALARM"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://replit.com/"
+        }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#0d2055",
+          "sounds": [],
+          "mode": "production"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

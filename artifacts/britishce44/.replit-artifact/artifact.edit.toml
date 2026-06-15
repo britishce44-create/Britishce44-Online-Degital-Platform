@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Britishce44 AI Digital School Platform"
+version = "1.0.0"
+id = "artifacts/britishce44"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19382
+
+[services.development]
+run = "pnpm --filter @workspace/britishce44 run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/britishce44", "run", "build" ]
+publicDir = "artifacts/britishce44/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19382"
+BASE_PATH = "/"

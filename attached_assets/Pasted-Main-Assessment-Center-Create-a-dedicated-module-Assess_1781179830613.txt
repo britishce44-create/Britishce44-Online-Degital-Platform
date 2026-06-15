@@ -1,0 +1,574 @@
+Main Assessment Center
+
+Create a dedicated module:
+
+Assessment Center
+
+Contains:
+
+Placement Tests
+Unit Tests
+Progress Tests
+Midterm Tests
+Final Exams
+Speaking Exams
+Listening Exams
+Writing Exams
+Reading Exams
+Homework Quizzes
+Mock Exams
+Kids Assessments
+IELTS Assessments
+TOEFL Assessments
+Teacher-Made Tests
+AI Generated Tests
+Diagnostic Tests
+Promotion Tests
+Exit Tests
+Certificate Qualification Exams
+User Roles
+Student
+
+Can:
+
+Take tests
+View scores
+View corrections
+View feedback
+View recommendations
+Retake if allowed
+Teacher
+
+Can:
+
+View every answer
+View score breakdown
+Add comments
+Override marks
+Approve grades
+Recalculate grades
+Export reports
+Academic Manager
+
+Can:
+
+Access all tests
+Compare classes
+Compare teachers
+Analyze pass rates
+Approve promotions
+Parent
+
+Can:
+
+View child results
+Download reports
+View recommendations
+SECTION 1: KIDS TESTING SYSTEM
+Curriculum
+Basic 1
+
+Book:
+
+Gogo Loves English 1
+
+Units 1-4
+
+Basic 2
+
+Units 5-8
+
+Basic 3
+
+Book 2
+
+Units 1-4
+
+Basic 4
+
+Book 2
+
+Units 5-8
+
+Continue same pattern until:
+
+Basic 12
+
+Book 6
+
+Units 5-8
+
+Kids Test Structure
+
+Every Basic Level Includes:
+
+Listening
+
+10 Questions
+
+Examples:
+
+Listen and choose picture.
+Listen and match.
+Listen and circle.
+Vocabulary
+
+15 Questions
+
+Examples:
+
+Match word and picture.
+Choose correct word.
+Complete missing word.
+Grammar
+
+10 Questions
+
+Examples:
+
+Choose correct answer.
+Rearrange words.
+Reading
+
+10 Questions
+
+Examples:
+
+Read and answer.
+Match sentence and picture.
+Speaking
+
+Teacher Evaluation:
+
+Criteria:
+
+Pronunciation
+Fluency
+Confidence
+Vocabulary
+
+Score:
+0-25 each
+
+Writing
+
+Criteria:
+
+Spelling
+Vocabulary
+Sentence formation
+Kids Automatic Report
+
+Example:
+
+Student:
+Ahmed Ali
+
+Level:
+Basic 5
+
+Overall:
+87%
+
+Strengths:
+
+Vocabulary
+Reading
+
+Weaknesses:
+
+Grammar
+Speaking confidence
+
+AI Recommendations:
+
+Watch Unit 6 video twice.
+Complete Grammar Practice 3.
+Join speaking club.
+
+Promotion:
+PASS
+
+SECTION 2: BASIC COURSE TESTS
+
+Curriculum:
+
+Fly High Series
+
+Basic 1
+
+Fly High 2
+
+Units 1-4
+
+Basic 2
+
+Units 5-8
+
+Basic 3
+
+Fly High 3
+
+Units 1-4
+
+Basic 4
+
+Units 5-8
+
+Basic 5
+
+Fly High 4
+
+Units 1-4
+
+Basic 6
+
+Units 5-8
+
+Basic Test Structure
+Listening
+
+20 Marks
+
+Questions:
+
+Multiple Choice
+Gap Fill
+Matching
+Grammar
+
+20 Marks
+
+Questions:
+
+Tenses
+Modals
+Articles
+Prepositions
+Vocabulary
+
+20 Marks
+
+Questions:
+
+Synonyms
+Antonyms
+Word Completion
+Reading
+
+20 Marks
+
+Questions:
+
+True/False
+Multiple Choice
+Short Answers
+Writing
+
+20 Marks
+
+Questions:
+
+Paragraph Writing
+Email Writing
+Story Completion
+
+Total:
+100 Marks
+
+SECTION 3: ADULT PROGRAM TESTS
+
+Curriculum
+
+Elementary A
+
+Speakout Elementary
+
+Units 1-4
+
+Elementary B
+
+Units 5-8
+
+Elementary C
+
+Units 9-12
+
+Pre-Intermediate A
+
+Speakout Pre-Intermediate
+
+Units 1-4
+
+Continue same pattern.
+
+Adult Exam Structure
+
+Listening:
+20
+
+Reading:
+20
+
+Grammar:
+15
+
+Vocabulary:
+15
+
+Writing:
+15
+
+Speaking:
+15
+
+Total:
+100
+
+Speaking Exam AI Engine
+
+The platform records:
+
+Pronunciation
+Fluency
+Intonation
+Grammar Accuracy
+Vocabulary Range
+
+AI gives:
+
+Pronunciation:
+82%
+
+Fluency:
+75%
+
+Grammar:
+88%
+
+Vocabulary:
+80%
+
+Final Speaking:
+81%
+
+Automatic Correction System
+Objective Questions
+
+Automatic:
+
+MCQ
+True False
+Matching
+Gap Fill
+
+Instant score.
+
+Writing Questions
+
+AI Evaluation
+
+Measures:
+
+Grammar
+Vocabulary
+Organization
+Relevance
+Coherence
+
+Score:
+0-100
+
+Speaking Questions
+
+AI Evaluation
+
+Measures:
+
+Pronunciation
+Fluency
+Accuracy
+Confidence
+
+Score:
+0-100
+
+Teacher Review Panel
+
+Teacher sees:
+
+Question 1
+
+Student Answer:
+I goed to school yesterday.
+
+AI Score:
+6/10
+
+Suggested Score:
+7/10
+
+Teacher Score:
+Editable
+
+Teacher Comment:
+Good attempt. Review past tense forms.
+
+Save
+
+Advanced Analytics
+Individual Student Dashboard
+
+Displays:
+
+Average Score
+Attendance
+Homework Completion
+Weak Skills
+Strong Skills
+Class Dashboard
+
+Displays:
+
+Class Average
+Pass Rate
+Fail Rate
+Weakest Unit
+Strongest Unit
+Teacher Dashboard
+
+Displays:
+
+Student Performance
+Promotion Rate
+Retention Rate
+Promotion Engine
+
+Automatically calculates:
+
+Attendance:
+20%
+
+Homework:
+20%
+
+Participation:
+10%
+
+Tests:
+50%
+
+Final Grade:
+100%
+
+Promotion Rules
+
+90-100
+Excellent
+
+80-89
+Very Good
+
+70-79
+Good
+
+60-69
+Pass
+
+Below 60
+Repeat Level
+
+Question Bank Architecture
+
+Every level contains:
+
+Unit Question Bank
+
+For each unit:
+
+300 Vocabulary Questions
+300 Grammar Questions
+150 Listening Questions
+150 Reading Questions
+100 Writing Prompts
+100 Speaking Prompts
+
+This prevents memorization.
+
+AI Test Generator
+
+Teacher selects:
+
+Course
+Book
+Unit Range
+Difficulty
+
+System creates:
+
+Quiz
+Progress Test
+Midterm
+Final Exam
+
+Automatically.
+
+Exam Security System
+
+Integrated with your Anti-Cheat Module
+
+Checks:
+
+Face Detection
+Tab Switching
+Full Screen
+Camera Presence
+Voice Detection
+Mobile Detection
+Multiple Person Detection
+
+Risk Score:
+
+0-100
+
+Low Risk
+
+Medium Risk
+
+High Risk
+
+Exam Invalid
+
+Database Structure
+
+Assessment Module Tables
+
+Tests
+Test Templates
+Questions
+Question Banks
+Student Attempts
+Answers
+AI Scores
+Teacher Scores
+Final Scores
+Feedback
+Recommendations
+Promotions
+Certificates
+Additional Manager Features
+
+Managers can:
+
+Open any student test.
+Replay listening submissions.
+Replay speaking recordings.
+Read writing responses.
+View AI analysis.
+View teacher edits.
+Override scores.
+Compare branches.
+Compare teachers.
+Export PDF reports.
+Export Excel reports.
+Generate accreditation reports.
