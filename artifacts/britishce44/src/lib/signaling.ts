@@ -27,7 +27,7 @@ export class SignalingService {
 
   connect(roomId: number, userId: string, name: string): Promise<{ routerRtpCapabilities: RtpCapabilities; participantId: string }> {
     return new Promise((resolve, reject) => {
-      const url = process.env.NEXT_PUBLIC_SIGNALING_URL || 'http://localhost:3002';
+      const url = (import.meta.env.VITE_SIGNALING_URL as string) || window.location.origin;
       this.socket = io(`${url}/signaling`, {
         transports: ['websocket'],
         forceNew: true,
