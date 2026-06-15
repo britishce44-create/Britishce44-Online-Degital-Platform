@@ -121,6 +121,7 @@ function ClassicTabLayout() {
       <Tabs.Screen name="video-editor" options={hiddenTab} />
       <Tabs.Screen name="academic-room" options={hiddenTab} />
       <Tabs.Screen name="classroom-room" options={hiddenTab} />
+      <Tabs.Screen name="profile" options={hiddenTab} />
     </Tabs>
   );
 }
