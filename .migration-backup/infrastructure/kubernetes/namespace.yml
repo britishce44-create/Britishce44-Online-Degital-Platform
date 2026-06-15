@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: britishce44
-  labels:
-    app: britishce44
-    environment: production
