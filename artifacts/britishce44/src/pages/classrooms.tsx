@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
+import toast from 'react-hot-toast'
 
 type RoomStatus = 'live' | 'scheduled' | 'empty' | 'locked'
 
@@ -34,6 +35,19 @@ function buildRooms(): Room[] {
       students: status === 'live' ? 12 + (i % 18) : 0, status,
       startTime: status === 'scheduled' ? START_TIMES[i % START_TIMES.length] : undefined,
     }
+  })
+}
+
+function getJoinLink(roomId: number): string {
+  return `${window.location.origin}${window.location.pathname}?room=${roomId}`
+}
+
+function copyJoinLink(roomId: number) {
+  const link = getJoinLink(roomId)
+  navigator.clipboard.writeText(link).then(() => {
+    toast.success(`🔗 Room ${roomId} link copied!`, { duration: 2000 })
+  }).catch(() => {
+    toast.error('Could not copy link')
   })
 }
 
@@ -106,13 +120,27 @@ function ClassroomCard({ room, onEnter }: { room: Room; onEnter: (id: number) =>
         <div className="flex-1" />
 
         {/* Footer */}
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between gap-1">
           {room.status === 'empty' && (
             <span className="text-[8px]" style={{ color: 'rgba(107,114,128,0.7)' }}>Available</span>
           )}
           {room.status === 'locked' && (
             <span className="text-[8px]" style={{ color: 'rgba(248,113,113,0.6)' }}>Restricted</span>
           )}
+
+          {/* Copy join link — always visible so teachers can share it */}
+          <button
+            onClick={e => { e.stopPropagation(); copyJoinLink(room.id) }}
+            title="Copy student join link"
+            className="flex items-center gap-0.5 text-[8px] px-2 py-1 rounded-full font-semibold transition-all hover:opacity-100 opacity-60"
+            style={{
+              background: 'rgba(255,255,255,0.06)',
+              color: 'rgba(147,197,253,0.9)',
+              border: '1px solid rgba(147,197,253,0.18)',
+            }}>
+            🔗 Link
+          </button>
+
           {(room.status === 'live' || room.status === 'scheduled' || room.status === 'empty') && (
             <button onClick={e => { e.stopPropagation(); onEnter(room.id) }}
               className="text-[9px] px-2.5 py-1 rounded-full font-bold transition-all ml-auto"

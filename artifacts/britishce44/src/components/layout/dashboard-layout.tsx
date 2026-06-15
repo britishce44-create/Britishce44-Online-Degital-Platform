@@ -48,11 +48,11 @@ export type PageKey =
   | 'downloadcenter' | 'parentportal' | 'compliance' | 'statuspage'
   | 'assessment' | 'calendar' | 'tasks' | 'googleforms'
 
-function DashboardInner() {
+function DashboardInner({ initialRoom }: { initialRoom?: number | null }) {
   const { user, logout } = useAuth()
-  const [currentPage, setCurrentPage] = useState<PageKey>('dashboard')
+  const [currentPage, setCurrentPage] = useState<PageKey>(initialRoom ? 'classrooms' : 'dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [classroomOpen, setClassroomOpen] = useState<number | null>(null)
+  const [classroomOpen, setClassroomOpen] = useState<number | null>(initialRoom ?? null)
 
   const renderPage = () => {
     if (classroomOpen !== null) {
@@ -128,10 +128,10 @@ function DashboardInner() {
   )
 }
 
-export function DashboardLayout() {
+export function DashboardLayout({ initialRoom }: { initialRoom?: number | null }) {
   return (
     <MaintenanceProvider>
-      <DashboardInner />
+      <DashboardInner initialRoom={initialRoom} />
     </MaintenanceProvider>
   )
 }

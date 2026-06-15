@@ -86,7 +86,7 @@ function PhotoMosaic() {
   )
 }
 
-export function LoginPage() {
+export function LoginPage({ pendingRoom }: { pendingRoom?: number | null }) {
   const { login } = useAuth()
   const [email, setEmail] = useState('britishce44@gmail.com')
   const [password, setPassword] = useState('')
@@ -184,6 +184,18 @@ export function LoginPage() {
               <p className="text-xs text-indigo-300/60 mt-0.5">Britishce44 · Online Digital School</p>
               <p className="text-[10px] text-sky-300/60 mt-0.5" style={{ fontFamily: 'Tajawal, sans-serif' }}>تعز · اليمن</p>
             </div>
+
+            {/* Classroom join banner */}
+            {pendingRoom && (
+              <div className="mb-5 flex items-center gap-2 rounded-xl px-3 py-2.5"
+                style={{ background: 'rgba(52,211,153,0.10)', border: '1px solid rgba(52,211,153,0.28)' }}>
+                <span className="text-lg">🎓</span>
+                <div>
+                  <p className="text-xs font-bold text-emerald-300">Joining Classroom #{pendingRoom}</p>
+                  <p className="text-[10px] text-emerald-300/60">Sign in to enter the class</p>
+                </div>
+              </div>
+            )}
 
             {/* Form */}
             <form onSubmit={handleLogin} className="space-y-4">
