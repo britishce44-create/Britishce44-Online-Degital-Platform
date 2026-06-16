@@ -6,6 +6,7 @@ import { EvalAdmin } from './academic-room-eval'
 import { GoogleFormsSection } from './google-forms'
 import { ScreenConsentViewer } from '@/components/exams/screen-consent-viewer'
 import { MeetingRoomWindow } from '@/components/meeting/meeting-room-window'
+import { WebRTCProvider } from '@/components/webrtc/webrtc-provider'
 
 /* Academic Management Room — Comprehensive center for all academic operations */
 
@@ -767,13 +768,15 @@ export function AcademicRoomPage() {
         )}
       </AnimatePresence>
 
-      {/* Floating meeting room — new elegant light design */}
+      {/* Floating meeting room — real WebRTC, 8-side resizable */}
       <AnimatePresence>
         {meetingActive && (
-          <MeetingRoomWindow
-            studentName={selectedStudent?.name}
-            onClose={() => { setMeetingActive(false); setSelectedStudent(null) }}
-          />
+          <WebRTCProvider>
+            <MeetingRoomWindow
+              studentName={selectedStudent?.name}
+              onClose={() => { setMeetingActive(false); setSelectedStudent(null) }}
+            />
+          </WebRTCProvider>
         )}
       </AnimatePresence>
 
