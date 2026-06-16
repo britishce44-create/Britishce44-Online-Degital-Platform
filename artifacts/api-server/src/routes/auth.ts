@@ -35,7 +35,7 @@ function splitName(name: string): { firstName: string; lastName: string } {
 router.post("/v1/auth/login", async (req, res) => {
   const { email, password } = req.body ?? {};
   if (!email || !password)
-    return res.status(400).json({ message: "Email and password are required" });
+    return res.status(400).json({ message: "User ID and password are required" });
 
   // 1. DB-backed users (seeded teachers/parents/admin) — proper role linkage.
   const [dbUser] = await db

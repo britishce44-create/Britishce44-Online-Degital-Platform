@@ -31,7 +31,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      setError("Please enter email and password");
+      setError("Please enter your User ID and password");
       return;
     }
     setError("");
@@ -205,18 +205,18 @@ export default function LoginScreen() {
 
           <View style={s.form}>
             <View>
-              <Text style={s.label}>Email Address</Text>
+              <Text style={s.label}>User ID or Email</Text>
               <View style={s.inputWrap}>
-                <Ionicons name="mail-outline" size={18} color={colors.mutedForeground} style={{ marginRight: 10 }} />
+                <Ionicons name="person-outline" size={18} color={colors.mutedForeground} style={{ marginRight: 10 }} />
                 <TextInput
                   style={s.input}
                   value={email}
                   onChangeText={setEmail}
-                  placeholder="your@email.com"
+                  placeholder="e.g. student01 or your@email.com"
                   placeholderTextColor={colors.mutedForeground}
                   autoCapitalize="none"
-                  keyboardType="email-address"
-                  autoComplete="email"
+                  keyboardType="default"
+                  autoComplete="username"
                 />
               </View>
             </View>

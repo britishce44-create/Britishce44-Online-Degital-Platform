@@ -96,7 +96,7 @@ export function LoginPage({ pendingRoom }: { pendingRoom?: number | null }) {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email || !password) { toast.error('Please enter email and password'); return }
+    if (!email || !password) { toast.error('Please enter your User ID and password'); return }
     setLoading(true)
     try {
       await login(email, password)
@@ -200,13 +200,14 @@ export function LoginPage({ pendingRoom }: { pendingRoom?: number | null }) {
             {/* Form */}
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-[10px] font-bold text-indigo-300/70 mb-1.5 uppercase tracking-widest">Email Address</label>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                <label className="block text-[10px] font-bold text-indigo-300/70 mb-1.5 uppercase tracking-widest">User ID or Email</label>
+                <input type="text" value={email} onChange={e => setEmail(e.target.value)}
                   className="w-full rounded-xl px-4 py-3 text-sm text-white outline-none transition"
                   style={{ background: 'rgba(37,99,235,0.10)', border: '1px solid rgba(37,99,235,0.30)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
                   onFocus={e => e.target.style.borderColor = 'rgba(0, 174, 116,0.70)'}
                   onBlur={e => e.target.style.borderColor = 'rgba(37,99,235,0.30)'}
-                  placeholder="your@email.com" />
+                  placeholder="e.g. student01 or your@email.com"
+                  autoComplete="username" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-blue-300/70 mb-1.5 uppercase tracking-widest">Password</label>
