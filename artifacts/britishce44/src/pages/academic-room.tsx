@@ -5,6 +5,7 @@ import { AssessmentAdmin } from './academic-room-assessment'
 import { EvalAdmin } from './academic-room-eval'
 import { GoogleFormsSection } from './google-forms'
 import { ScreenConsentViewer } from '@/components/exams/screen-consent-viewer'
+import { MeetingRoomWindow } from '@/components/meeting/meeting-room-window'
 
 /* Academic Management Room — Comprehensive center for all academic operations */
 
@@ -766,62 +767,13 @@ export function AcademicRoomPage() {
         )}
       </AnimatePresence>
 
-      {/* Floating meeting room */}
+      {/* Floating meeting room — new elegant light design */}
       <AnimatePresence>
-        {meetingActive&&(
-          <motion.div initial={{opacity:0,scale:0.85,y:40}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:0.85,y:40}}
-            className="fixed z-50 shadow-2xl rounded-2xl overflow-hidden"
-            style={{
-              bottom:meetingMinimized?'20px':'50%',right:'20px',
-              width:meetingMinimized?'220px':'480px',
-              height:meetingMinimized?'52px':'320px',
-              transform:meetingMinimized?undefined:'translateY(50%)',
-              background:'#1d1668',border:'1px solid rgba(52,211,153,0.35)',
-              boxShadow:'0 24px 64px rgba(0,0,0,0.60)',
-            }}>
-            {/* Meeting header */}
-            <div className="flex items-center gap-2 px-3 py-2.5 flex-shrink-0"
-              style={{background:'linear-gradient(135deg,rgba(5,150,105,0.25),rgba(16,185,129,0.15))',borderBottom:'1px solid rgba(52,211,153,0.15)'}}>
-              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-black text-emerald-400 truncate">🎥 Academic Meeting Room</p>
-                {selectedStudent&&<p className="text-[9px] text-white/40 truncate">{selectedStudent.name}</p>}
-              </div>
-              <button onClick={()=>setMeetingMinimized(m=>!m)} className="text-white/40 hover:text-white transition text-xs">{meetingMinimized?'⬆':'⬇'}</button>
-              <button onClick={()=>{setMeetingActive(false);setSelectedStudent(null)}} className="text-white/40 hover:text-red-400 transition text-xs">✕</button>
-            </div>
-
-            {!meetingMinimized&&(
-              <div className="flex flex-col h-full">
-                {/* Video area */}
-                <div className="flex-1 relative" style={{background:'linear-gradient(135deg,#17125c,#241c80)'}}>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center">
-                      <p className="text-4xl mb-2">🎥</p>
-                      <p className="text-xs text-white/40">Camera feed · Academic interview room</p>
-                      {selectedStudent&&<p className="text-xs text-emerald-400 mt-1">{selectedStudent.name}</p>}
-                    </div>
-                  </div>
-                  {/* Local camera PiP */}
-                  <div className="absolute bottom-2 right-2 w-16 h-12 rounded-lg"
-                    style={{background:'rgba(0,0,0,0.5)',border:'1px solid rgba(255,255,255,0.10)'}}>
-                    <div className="w-full h-full flex items-center justify-center text-xl">👤</div>
-                  </div>
-                </div>
-                {/* Meeting controls */}
-                <div className="flex items-center justify-center gap-3 px-4 py-3 flex-shrink-0" style={{borderTop:'1px solid rgba(255,255,255,0.06)'}}>
-                  {[{icon:'🎙',label:'Mute'},{icon:'📷',label:'Camera'},{icon:'💬',label:'Chat'},{icon:'📋',label:'Notes'},{icon:'📞',label:'End',red:true}].map(btn=>(
-                    <button key={btn.label} title={btn.label}
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-sm transition hover:scale-110"
-                      style={{background:btn.red?'rgba(239,68,68,0.25)':'rgba(255,255,255,0.06)',border:`1px solid ${btn.red?'rgba(239,68,68,0.40)':'rgba(255,255,255,0.10)'}`}}
-                      onClick={()=>{if(btn.red){setMeetingActive(false);setSelectedStudent(null)}}}>
-                      {btn.icon}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </motion.div>
+        {meetingActive && (
+          <MeetingRoomWindow
+            studentName={selectedStudent?.name}
+            onClose={() => { setMeetingActive(false); setSelectedStudent(null) }}
+          />
         )}
       </AnimatePresence>
 
