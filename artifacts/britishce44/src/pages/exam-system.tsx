@@ -1,5 +1,5 @@
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ScreenConsentViewer } from '@/components/exams/screen-consent-viewer'
 
@@ -238,10 +238,19 @@ export function PdfImportModal({onClose}:{onClose:()=>void}) {
 }
 
 /* ─── Tests Bakery (Form Builder) ──────────────────── */
-function TestsBakery() {
+function TestsBakery({ editingExam, onSaved }: { editingExam?: Exam | null; onSaved?: () => void }) {
   const [questions,setQuestions]=useState<Question[]>([])
-  const [testTitle,setTestTitle]=useState('')
+  const [testTitle,setTestTitle]=useState(editingExam?.title ?? '')
   const [showPdfImport,setShowPdfImport]=useState(false)
+  const [saved,setSaved]=useState(false)
+
+  useEffect(() => {
+    if (editingExam) {
+      setTestTitle(editingExam.title)
+      setQuestions([])
+      setSaved(false)
+    }
+  }, [editingExam?.id])
 
   const addQ=(type:Question['type'])=>{
     const nq:Question={id:`q${Date.now()}`,text:'',type,options:type==='mcq'?['Option A','Option B','Option C','Option D']:undefined,points:2}
@@ -257,8 +266,14 @@ function TestsBakery() {
       <div className="rounded-2xl p-4" style={{background:'linear-gradient(135deg,#00805a,#0a85c2)',border:'1px solid rgba(21,13,121,0.08)'}}>
         <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
           <div>
-            <h3 className="text-lg font-black text-white">🧁 Tests Bakery</h3>
-            <p className="text-[10px] text-white/80">Advanced form builder · Like Google Forms + Microsoft Forms + KoboToolbox</p>
+            <h3 className="text-lg font-black text-white">
+              {editingExam ? '✏️ Editing Test' : '🧁 Tests Bakery'}
+            </h3>
+            <p className="text-[10px] text-white/80">
+              {editingExam
+                ? `Editing: ${editingExam.title} · Model ${editingExam.model} · ${editingExam.type}`
+                : 'Advanced form builder · Like Google Forms + Microsoft Forms + KoboToolbox'}
+            </p>
           </div>
           <div className="flex gap-2">
             <button onClick={()=>setShowPdfImport(true)}
@@ -266,9 +281,10 @@ function TestsBakery() {
               style={{background:'rgba(139,92,246,0.15)',color:'#bae6fd',border:'1px solid rgba(139,92,246,0.25)'}}>
               📄 Import PDF
             </button>
-            <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition"
-              style={{background:'rgba(52,211,153,0.15)',color:'#34d399',border:'1px solid rgba(52,211,153,0.25)'}}>
-              💾 Save Test
+            <button onClick={()=>{ setSaved(true); setTimeout(()=>{ setSaved(false); onSaved?.() },1400) }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition"
+              style={{background: saved ? 'rgba(52,211,153,0.30)' : 'rgba(52,211,153,0.15)', color:'#34d399', border:'1px solid rgba(52,211,153,0.25)'}}>
+              {saved ? '✅ Saved!' : '💾 Save Test'}
             </button>
             <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition"
               style={{background:'rgba(0, 174, 116,0.15)',color:'#00ae74',border:'1px solid rgba(0, 174, 116,0.25)'}}>
@@ -372,6 +388,17 @@ export function ExamSystemPage() {
   const [settingsExam,setSettingsExam]=useState<Exam|null>(null)
   const [showPdfImport,setShowPdfImport]=useState(false)
   const [viewer,setViewer]=useState<{name:string;ctx:string}|null>(null)
+  const [editingExam,setEditingExam]=useState<Exam|null>(null)
+  const [isAdmin,setIsAdmin]=useState(false)
+
+  useEffect(()=>{
+    try {
+      const stored=localStorage.getItem('b44_user')
+      if (stored) { const u=JSON.parse(stored); setIsAdmin(u.role==='admin') }
+    } catch {}
+  },[])
+
+  const openEdit=(e:Exam)=>{ setEditingExam(e); setTab('bakery') }
 
   const models=['A','B','C','D','E','F','G','H','I','J']
   const filtered=exams.filter(e=>{
@@ -480,7 +507,14 @@ export function ExamSystemPage() {
                       <span>❓ {e.questions}q</span>
                       <span>⭐ {e.points}pts</span>
                     </div>
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1.5 flex-wrap">
+                      {isAdmin&&(
+                        <button onClick={()=>openEdit(e)}
+                          className="flex-1 py-1.5 rounded-lg text-[10px] font-bold transition"
+                          style={{background:'linear-gradient(135deg,rgba(245,158,11,0.15),rgba(217,119,6,0.10))',color:'#d97706',border:'1px solid rgba(245,158,11,0.35)'}}>
+                          ✏️ Edit
+                        </button>
+                      )}
                       <button onClick={()=>setSettingsExam(e)}
                         className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold transition"
                         style={{background:'rgba(63, 186, 235,0.12)',color:'#0369a1',border:'1px solid rgba(63, 186, 235,0.20)'}}>
@@ -514,7 +548,7 @@ export function ExamSystemPage() {
       )}
 
       {/* TESTS BAKERY */}
-      {tab==='bakery'&&<TestsBakery />}
+      {tab==='bakery'&&<TestsBakery editingExam={editingExam} onSaved={()=>{ setEditingExam(null); setTab('bank') }} />}
 
       {/* SCHEDULE */}
       {tab==='schedule'&&(
