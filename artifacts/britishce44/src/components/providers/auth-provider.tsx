@@ -42,12 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (stored) {
       try {
         const parsed = JSON.parse(stored)
-        // Newcomer registrations are form submissions only — do not restore as logged-in user.
-        if (parsed?.role === 'newcomer') {
-          localStorage.removeItem('b44_user')
-        } else {
-          setUser(parsed)
-        }
+        setUser(parsed)
       } catch { localStorage.removeItem('b44_user') }
     }
     setIsLoading(false)
@@ -90,12 +85,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerNewcomer = useCallback(async (data: NewcomerData) => {
     const id = `newcomer-${Date.now()}`
-    const newcomer: NewcomerData = { ...data, id }
+    const newcomer: NewcomerData = { ...data, id, status: 'waiting' as const }
     const existing = JSON.parse(localStorage.getItem('b44_newcomers') || '[]')
     existing.push(newcomer)
     localStorage.setItem('b44_newcomers', JSON.stringify(existing))
-    // Do NOT set as current user — newcomer registration is just a form submission.
-    // The user should stay on the login page to sign in with their credentials.
+    // Set as logged-in user so they can access the interview waiting room.
+    const newUser: User = {
+      id, email: data.gmail, firstName: data.firstName, lastName: data.lastName,
+      role: 'newcomer', newcomerData: newcomer,
+    }
+    localStorage.setItem('b44_user', JSON.stringify(newUser))
+    setUser(newUser)
   }, [])
 
   const getNewcomers = useCallback((): NewcomerData[] => {

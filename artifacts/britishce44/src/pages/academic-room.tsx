@@ -257,6 +257,12 @@ export function AcademicRoomPage() {
               <span className="text-xs text-emerald-400 font-bold">Waiting for supervisor to connect…</span>
             </div>
 
+            <button onClick={() => setInterviewMeeting(true)}
+              className="w-full py-3.5 rounded-xl font-bold text-sm transition-all golden-gradient text-white mb-3"
+              style={{boxShadow:'0 4px 20px rgba(212,160,23,0.35)',fontFamily:'Cairo, sans-serif'}}>
+              🎥 Meet the Supervisor · مقابلة المشرف
+            </button>
+
             <p className="text-[10px] text-gray-500">The placement interview includes a video call and a short English assessment.</p>
           </div>
         </div>
