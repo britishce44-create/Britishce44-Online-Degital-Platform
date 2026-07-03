@@ -1,0 +1,47 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: britishce44-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: britishce44
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-britishce44_secret}
+      POSTGRES_DB: britishce44
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U britishce44"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  coturn:
+    image: coturn/coturn:latest
+    container_name: britishce44-turn
+    restart: unless-stopped
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "5349:5349/udp"
+      - "5349:5349/tcp"
+      - "49152-65535:49152-65535/udp"
+    command: >
+      -n --log-file=stdout
+      --realm=britishce44.com
+      --listening-port=3478
+      --tls-listening-port=5349
+      --fingerprint
+      --lt-cred-mech
+      --user=${TURN_USER:-britishce44}:${TURN_SECRET:-turn_secret_2026}
+      --total-quota=100
+      --stale-nonce=600
+      --no-multicast-peers
+      --no-cli
+    network_mode: host
+
+volumes:
+  pgdata:

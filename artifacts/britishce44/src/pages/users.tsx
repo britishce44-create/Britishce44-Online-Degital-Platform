@@ -1,163 +1,240 @@
-
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
+import { ContactsManager } from '@/components/contacts/contacts-manager'
 import { motion, AnimatePresence } from 'framer-motion'
+import { apiGet, apiPost, apiPatch, apiDelete, ApiError } from '@/lib/api'
 
+type Tab = 'users' | 'contacts'
 type Role = 'admin' | 'teacher' | 'student' | 'supervisor' | 'parent'
 type Status = 'active' | 'inactive' | 'suspended'
 
-interface Permission { key: string; label: string; labelAr: string }
-interface User {
-  id: number; name: string; email: string; role: Role; status: Status
-  lastSeen: string; classrooms?: number; grade?: string; phone?: string
-  accessFrom?: string; accessTo?: string; permissions?: string[]
-  joinDate?: string; courses?: string[]
+interface ApiUser {
+  id: number; email: string; name: string; role: Role;
+  phone: string; status: Status; permissions: string[];
+  accessFrom: string; accessTo: string;
+  dashboardConfig: Record<string, boolean>;
+  lastSeen: string; createdAt: string; updatedAt: string;
 }
 
-const ALL_PERMISSIONS: Permission[] = [
-  { key:'classrooms',  label:'Enter Classrooms',     labelAr:'دخول الفصول' },
-  { key:'exams',       label:'Take / Manage Exams',  labelAr:'الاختبارات' },
-  { key:'messenger',   label:'CE4 Messenger',         labelAr:'المراسلة' },
-  { key:'homework',    label:'Homework Dropbox',       labelAr:'الواجبات' },
-  { key:'reports',     label:'View Reports',           labelAr:'التقارير' },
-  { key:'recordings',  label:'Access Recordings',      labelAr:'التسجيلات' },
-  { key:'placements',  label:'Placement Tests',        labelAr:'اختبار المستوى' },
-  { key:'analytics',   label:'Live Analytics',         labelAr:'الإحصائيات' },
+const ALL_PERMISSIONS = [
+  { key: 'classrooms', label: 'Classrooms', icon: '🚪' },
+  { key: 'exams', label: 'Exams', icon: '📝' },
+  { key: 'messenger', label: 'Messenger', icon: '💬' },
+  { key: 'homework', label: 'Homework', icon: '📄' },
+  { key: 'reports', label: 'Reports', icon: '📊' },
+  { key: 'recordings', label: 'Recordings', icon: '🎞️' },
+  { key: 'placements', label: 'Placements', icon: '🎯' },
+  { key: 'analytics', label: 'Analytics', icon: '📈' },
+  { key: 'settings', label: 'Settings', icon: '⚙️' },
+  { key: 'users', label: 'User Mgmt', icon: '👥' },
+  { key: 'assessment', label: 'Assessment', icon: '✍️' },
+  { key: 'attendance', label: 'Attendance', icon: '📅' },
+  { key: 'results', label: 'Results', icon: '🏆' },
+  { key: 'videoeditor', label: 'Video Editor', icon: '🎬' },
+  { key: 'marketing', label: 'Marketing', icon: '📢' },
+  { key: 'ailearning', label: 'AI Learning', icon: '🧠' },
+  { key: 'parentportal', label: 'Parent Portal', icon: '👨‍👩‍👧' },
 ]
 
-const SEED: User[] = [
-  { id:1, name:'Admin — Britishce44', email:'britishce44@gmail.com', role:'admin', status:'active', lastSeen:'Now', phone:'+967 770 000 001', joinDate:'2020-01-01', accessFrom:'00:00', accessTo:'23:59', permissions:ALL_PERMISSIONS.map(p=>p.key) },
-  { id:2, name:'Suhair Almojahid', email:'suhair@britishce44.edu', role:'teacher', status:'active', lastSeen:'5 min ago', classrooms:5, phone:'+967 770 000 002', joinDate:'2021-03-12', accessFrom:'07:00', accessTo:'22:00', permissions:['classrooms','exams','messenger','homework','reports','recordings'] },
-  { id:3, name:"Wa'ad Alhammadi", email:'waad@britishce44.edu', role:'teacher', status:'active', lastSeen:'1 hr ago', classrooms:4, phone:'+967 770 000 003', joinDate:'2021-06-01', accessFrom:'07:00', accessTo:'20:00', permissions:['classrooms','exams','messenger','homework'] },
-  { id:4, name:'Jamal Alshameeri', email:'jamal@britishce44.edu', role:'teacher', status:'active', lastSeen:'2 hr ago', classrooms:6, phone:'+967 770 000 004', joinDate:'2021-09-15', accessFrom:'08:00', accessTo:'21:00', permissions:['classrooms','exams','messenger','homework','recordings'] },
-  { id:5, name:'Amani Alsharabi', email:'amani@britishce44.edu', role:'teacher', status:'inactive', lastSeen:'3 days ago', classrooms:3, phone:'+967 770 000 005', joinDate:'2022-01-01', accessFrom:'09:00', accessTo:'18:00', permissions:['classrooms','messenger'] },
-  { id:6, name:'Supervisor Ali Hassan', email:'ali@britishce44.edu', role:'supervisor', status:'active', lastSeen:'30 min ago', phone:'+967 770 000 006', joinDate:'2020-06-01', accessFrom:'06:00', accessTo:'23:00', permissions:ALL_PERMISSIONS.map(p=>p.key) },
-  { id:7, name:'Ahmed Nasser', email:'ahmed@britishce44.edu', role:'student', status:'active', lastSeen:'10 min ago', grade:'Gogo 3', phone:'+967 770 000 007', joinDate:'2023-09-01', accessFrom:'08:00', accessTo:'20:00', permissions:['classrooms','exams','messenger','homework','placements'] },
-  { id:8, name:'Mona Alqaiti', email:'mona@britishce44.edu', role:'student', status:'active', lastSeen:'1 hr ago', grade:'Speakout Int', phone:'+967 770 000 008', joinDate:'2023-09-01', accessFrom:'08:00', accessTo:'20:00', permissions:['classrooms','exams','messenger','homework'] },
-  { id:9, name:'Omar Althawr', email:'omar@britishce44.edu', role:'student', status:'inactive', lastSeen:'1 week ago', grade:'Phonics 2', phone:'+967 770 000 009', joinDate:'2023-02-01', accessFrom:'09:00', accessTo:'18:00', permissions:['classrooms'] },
-  { id:10, name:'Sara Almahdi', email:'sara@britishce44.edu', role:'student', status:'active', lastSeen:'15 min ago', grade:'Gogo 5', phone:'+967 770 000 010', joinDate:'2023-05-01', accessFrom:'08:00', accessTo:'20:00', permissions:['classrooms','exams','messenger','homework','placements'] },
-  { id:11, name:'Hassan Almakhlafi', email:'hassan@britishce44.edu', role:'teacher', status:'active', lastSeen:'20 min ago', classrooms:7, phone:'+967 770 000 011', joinDate:'2022-09-01', accessFrom:'07:00', accessTo:'22:00', permissions:['classrooms','exams','messenger','homework','reports','recordings'] },
-  { id:12, name:'Fatima Alomari', email:'fatima@britishce44.edu', role:'parent', status:'active', lastSeen:'2 days ago', phone:'+967 770 000 012', joinDate:'2023-09-01', accessFrom:'06:00', accessTo:'23:00', permissions:['reports'] },
-  { id:13, name:'Khaled Alghaily', email:'khaled@britishce44.edu', role:'student', status:'suspended', lastSeen:'5 days ago', grade:'Gogo 2', phone:'+967 770 000 013', joinDate:'2023-01-01', accessFrom:'08:00', accessTo:'18:00', permissions:[] },
-  { id:14, name:'Nadia Alqaiti', email:'nadia@britishce44.edu', role:'teacher', status:'active', lastSeen:'45 min ago', classrooms:5, phone:'+967 770 000 014', joinDate:'2022-03-01', accessFrom:'07:00', accessTo:'21:00', permissions:['classrooms','exams','messenger','homework','recordings'] },
-  { id:15, name:'Ibrahim Almojahid', email:'ibrahim@britishce44.edu', role:'student', status:'active', lastSeen:'3 hr ago', grade:'Phonics 3', phone:'+967 770 000 015', joinDate:'2023-09-01', accessFrom:'08:00', accessTo:'20:00', permissions:['classrooms','exams','messenger','homework'] },
+const DASHBOARD_WIDGETS = [
+  { key: 'overview', label: 'Overview Stats', icon: '📊' },
+  { key: 'courses', label: 'My Courses', icon: '📚' },
+  { key: 'schedule', label: 'Schedule', icon: '📅' },
+  { key: 'tasks', label: 'Tasks', icon: '✅' },
+  { key: 'notifications', label: 'Notifications', icon: '🔔' },
+  { key: 'recentActivity', label: 'Recent Activity', icon: '🕐' },
+  { key: 'performance', label: 'Performance', icon: '📈' },
+  { key: 'attendance', label: 'Attendance', icon: '🚦' },
+  { key: 'messages', label: 'Messages', icon: '💬' },
+  { key: 'announcements', label: 'Announcements', icon: '📣' },
 ]
 
-const ROLE_CFG: Record<Role,{color:string;bg:string;emoji:string;label:string}> = {
-  admin:      { color:'#fbbf24', bg:'rgba(251,191,36,0.12)',  emoji:'👑',  label:'Admin' },
-  teacher:    { color:'#60a5fa', bg:'rgba(129,140,248,0.12)', emoji:'👩‍🏫', label:'Teacher' },
-  supervisor: { color:'#34d399', bg:'rgba(52,211,153,0.12)',  emoji:'🔭',  label:'Supervisor' },
-  student:    { color:'#38bdf8', bg:'rgba(56,189,248,0.10)',  emoji:'🎓',  label:'Student' },
-  parent:     { color:'#fb923c', bg:'rgba(251,146,60,0.10)',  emoji:'👪',  label:'Parent' },
-}
-const STATUS_CFG: Record<Status,{color:string;label:string;dot:string}> = {
-  active:    { color:'#34d399', label:'Active',    dot:'bg-emerald-400 animate-pulse' },
-  inactive:  { color:'#94a3b8', label:'Inactive',  dot:'bg-slate-400' },
-  suspended: { color:'#f87171', label:'Suspended', dot:'bg-red-400' },
+const ROLE_CFG: Record<Role, { color: string; bg: string; emoji: string; label: string }> = {
+  admin: { color: '#2563eb', bg: '#dbeafe', emoji: '👑', label: 'Admin' },
+  teacher: { color: '#0284c7', bg: '#e0f2fe', emoji: '👩‍🏫', label: 'Teacher' },
+  supervisor: { color: '#0d9488', bg: '#ccfbf1', emoji: '🔭', label: 'Supervisor' },
+  student: { color: '#4f46e5', bg: '#eef2ff', emoji: '🎓', label: 'Student' },
+  parent: { color: '#7c3aed', bg: '#f5f3ff', emoji: '👪', label: 'Parent' },
 }
 
-function Avatar({name,role}:{name:string;role:Role}) {
-  const c=ROLE_CFG[role]
-  return (
-    <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
-      style={{background:c.bg,color:c.color,border:`1.5px solid ${c.color}30`}}>
-      {name.charAt(0)}
-    </div>
+const STATUS_CFG: Record<Status, { color: string; label: string; dot: string }> = {
+  active: { color: '#059669', label: 'Active', dot: '#34d399' },
+  inactive: { color: '#94a3b8', label: 'Inactive', dot: '#cbd5e1' },
+  suspended: { color: '#dc2626', label: 'Suspended', dot: '#f87171' },
+}
+
+function UserModal({
+  user, onSave, onClose,
+}: {
+  user?: ApiUser | null; onSave: (data: any) => void; onClose: () => void
+}) {
+  const [name, setName] = useState(user?.name ?? '')
+  const [email, setEmail] = useState(user?.email ?? '')
+  const [password, setPassword] = useState('')
+  const [role, setRole] = useState<Role>(user?.role ?? 'student')
+  const [phone, setPhone] = useState(user?.phone ?? '')
+  const [status, setStatus] = useState<Status>(user?.status ?? 'active')
+  const [accessFrom, setAccessFrom] = useState(user?.accessFrom ?? '00:00')
+  const [accessTo, setAccessTo] = useState(user?.accessTo ?? '23:59')
+  const [permissions, setPermissions] = useState<string[]>(user?.permissions ?? [])
+  const [dashboardConfig, setDashboardConfig] = useState<Record<string, boolean>>(
+    user?.dashboardConfig ?? Object.fromEntries(DASHBOARD_WIDGETS.map(w => [w.key, true]))
   )
-}
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const isNew = !user
 
-function EditModal({user,onSave,onClose}:{user:User;onSave:(u:User)=>void;onClose:()=>void}) {
-  const [form,setForm]=useState({...user,permissions:user.permissions??[]})
-  const perms=form.permissions
-  const toggle=(key:string)=>setForm(f=>({...f,permissions:perms.includes(key)?perms.filter(p=>p!==key):[...perms,key]}))
-  const inp="w-full rounded-lg px-3 py-2 text-sm text-white outline-none bg-white/5 border border-white/10 focus:border-indigo-400/60 placeholder-white/25 transition"
-  const isNew=!SEED.find(u=>u.id===user.id)
+  const handleSave = async () => {
+    setErr('')
+    if (!name.trim()) { setErr('Name is required'); return }
+    if (!email.trim()) { setErr('Email is required'); return }
+    if (isNew && !password) { setErr('Password is required for new users'); return }
+    setBusy(true)
+    try {
+      const body = { name: name.trim(), email: email.trim(), password, role, phone, status, accessFrom, accessTo, permissions, dashboardConfig }
+      if (isNew) {
+        await apiPost('/users', body)
+      } else {
+        const { password: _, ...updateBody } = body
+        await apiPatch(`/users/${user!.id}`, updateBody)
+        if (password) await apiPatch(`/users/${user!.id}/password`, { password })
+      }
+      onSave(body)
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Save failed')
+    } finally { setBusy(false) }
+  }
+
+  const togglePerm = (key: string) =>
+    setPermissions(p => p.includes(key) ? p.filter(x => x !== key) : [...p, key])
+
+  const toggleDashboard = (key: string) =>
+    setDashboardConfig(d => ({ ...d, [key]: !d[key] }))
+
+  const selectAllPerms = () => setPermissions(ALL_PERMISSIONS.map(p => p.key))
+  const clearAllPerms = () => setPermissions([])
+  const enableAllDashboard = () => setDashboardConfig(Object.fromEntries(DASHBOARD_WIDGETS.map(w => [w.key, true])))
+  const disableAllDashboard = () => setDashboardConfig(Object.fromEntries(DASHBOARD_WIDGETS.map(w => [w.key, false])))
+
+  const inp = "w-full rounded-lg px-3.5 py-2.5 text-sm text-gray-900 bg-white border border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none placeholder:text-gray-400 transition"
+  const label = "block text-xs font-semibold text-blue-800 mb-1"
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{background:'rgba(0,0,0,0.75)',backdropFilter:'blur(8px)'}}>
-      <motion.div initial={{opacity:0,scale:0.94}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:0.94}}
-        className="w-full max-w-2xl rounded-2xl overflow-auto shadow-2xl" style={{background:'#1d1668',border:'1px solid rgba(63, 186, 235,0.30)',maxHeight:'90vh'}}>
-        <div className="h-0.5 bg-gradient-to-r from-indigo-500 via-violet-500 to-amber-400" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.8)', backdropFilter: 'blur(4px)' }}>
+      <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        className="w-full max-w-3xl rounded-2xl overflow-auto shadow-2xl bg-white max-h-[90vh]">
+        <div className="h-1.5 bg-gradient-to-r from-blue-600 via-sky-400 to-blue-300" />
         <div className="p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-lg font-black text-white">{isNew?'➕ Add New User':'✏️ Edit User'}</h3>
-            <button onClick={onClose} className="text-white/30 hover:text-white text-2xl leading-none">✕</button>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-lg font-bold text-blue-900">{isNew ? '➕ Create New User' : '✏️ Edit User'}</h3>
+              <p className="text-xs text-blue-500 mt-0.5">{isNew ? 'Set up a new account' : `User #${user!.id} — ${user!.email}`}</p>
+            </div>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-blue-400 hover:bg-blue-50 hover:text-blue-700 transition text-lg">✕</button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
-            <div className="sm:col-span-2">
-              <label className="block text-[10px] font-bold text-indigo-300/60 uppercase tracking-widest mb-1.5">Full Name</label>
-              <input className={inp} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Full name…" />
+          {err && (
+            <div className="mb-4 px-4 py-2.5 rounded-xl text-sm font-medium bg-red-50 text-red-600 border border-red-200">{err}</div>
+          )}
+
+          {/* Basic info */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <div className="sm:col-span-2 lg:col-span-3">
+              <label className={label}>Full Name</label>
+              <input className={inp} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Ahmed Nasser" />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-indigo-300/60 uppercase tracking-widest mb-1.5">Email</label>
-              <input className={inp} type="email" value={form.email} onChange={e=>setForm(f=>({...f,email:e.target.value}))} placeholder="email@example.com" />
+              <label className={label}>Email Address</label>
+              <input className={inp} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="user@example.com" />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-indigo-300/60 uppercase tracking-widest mb-1.5">Phone / WhatsApp</label>
-              <input className={inp} value={form.phone??''} onChange={e=>setForm(f=>({...f,phone:e.target.value}))} placeholder="+967 7XX XXX XXX" />
+              <label className={label}>{isNew ? 'Password' : 'New Password (leave blank to keep)'}</label>
+              <input className={inp} type="text" value={password} onChange={e => setPassword(e.target.value)} placeholder={isNew ? 'Set password' : 'Leave blank to keep'} />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-indigo-300/60 uppercase tracking-widest mb-1.5">Role</label>
-              <select className={`${inp} bg-[#1d1668]`} value={form.role} onChange={e=>setForm(f=>({...f,role:e.target.value as Role}))}>
-                {(Object.keys(ROLE_CFG) as Role[]).map(r=><option key={r} value={r}>{ROLE_CFG[r].emoji} {ROLE_CFG[r].label}</option>)}
+              <label className={label}>Phone / WhatsApp</label>
+              <input className={inp} value={phone} onChange={e => setPhone(e.target.value)} placeholder="+967 7XX XXX XXX" />
+            </div>
+            <div>
+              <label className={label}>Role</label>
+              <select className={inp} value={role} onChange={e => setRole(e.target.value as Role)}>
+                {(Object.keys(ROLE_CFG) as Role[]).map(r => <option key={r} value={r}>{ROLE_CFG[r].emoji} {ROLE_CFG[r].label}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-indigo-300/60 uppercase tracking-widest mb-1.5">Status</label>
-              <select className={`${inp} bg-[#1d1668]`} value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value as Status}))}>
+              <label className={label}>Account Status</label>
+              <select className={inp} value={status} onChange={e => setStatus(e.target.value as Status)}>
                 <option value="active">✅ Active</option>
                 <option value="inactive">⏸ Inactive</option>
                 <option value="suspended">🚫 Suspended</option>
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-indigo-300/60 uppercase tracking-widest mb-1.5">Access From (time)</label>
-              <input type="time" className={inp} value={form.accessFrom??'07:00'} onChange={e=>setForm(f=>({...f,accessFrom:e.target.value}))} />
+              <label className={label}>Access From</label>
+              <input type="time" className={inp} value={accessFrom} onChange={e => setAccessFrom(e.target.value)} />
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-indigo-300/60 uppercase tracking-widest mb-1.5">Access Until (time)</label>
-              <input type="time" className={inp} value={form.accessTo??'22:00'} onChange={e=>setForm(f=>({...f,accessTo:e.target.value}))} />
+              <label className={label}>Access Until</label>
+              <input type="time" className={inp} value={accessTo} onChange={e => setAccessTo(e.target.value)} />
             </div>
           </div>
 
           {/* Permissions */}
-          <div className="mb-5 p-4 rounded-xl" style={{background:'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.06)'}}>
+          <div className="mb-6 p-5 rounded-xl bg-blue-50 border border-blue-100">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-black text-white/70 uppercase tracking-widest">🔐 Platform Permissions</p>
+              <p className="text-sm font-bold text-blue-900">🔐 Platform Permissions</p>
               <div className="flex gap-2">
-                <button onClick={()=>setForm(f=>({...f,permissions:ALL_PERMISSIONS.map(p=>p.key)}))}
-                  className="text-[10px] px-2.5 py-1 rounded-full font-semibold" style={{background:'rgba(52,211,153,0.15)',color:'#34d399'}}>Grant All</button>
-                <button onClick={()=>setForm(f=>({...f,permissions:[]}))}
-                  className="text-[10px] px-2.5 py-1 rounded-full font-semibold" style={{background:'rgba(248,113,113,0.15)',color:'#f87171'}}>Revoke All</button>
+                <button onClick={selectAllPerms} className="text-xs px-3 py-1 rounded-full font-semibold bg-blue-600 text-white hover:bg-blue-700 transition">Grant All</button>
+                <button onClick={clearAllPerms} className="text-xs px-3 py-1 rounded-full font-semibold bg-gray-200 text-gray-600 hover:bg-gray-300 transition">Clear</button>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {ALL_PERMISSIONS.map(p=>{
-                const on=perms.includes(p.key)
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              {ALL_PERMISSIONS.map(p => {
+                const on = permissions.includes(p.key)
                 return (
-                  <button key={p.key} onClick={()=>toggle(p.key)}
-                    className="flex items-center gap-2.5 p-2.5 rounded-xl text-left transition"
-                    style={{background:on?'rgba(63, 186, 235,0.12)':'rgba(255,255,255,0.02)',border:`1px solid ${on?'rgba(63, 186, 235,0.35)':'rgba(255,255,255,0.05)'}`}}>
-                    <div className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0"
-                      style={{background:on?'#3b82f6':'rgba(255,255,255,0.04)',border:`1px solid ${on?'#3b82f6':'rgba(255,255,255,0.12)'}`}}>
-                      {on&&<span className="text-[8px] text-white font-black">✓</span>}
+                  <button key={p.key} onClick={() => togglePerm(p.key)}
+                    className={`flex items-center gap-2 p-2.5 rounded-xl text-left transition border ${on ? 'bg-white border-blue-300 shadow-sm' : 'bg-blue-50/50 border-transparent hover:bg-blue-100/50'}`}>
+                    <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 border transition ${on ? 'bg-blue-600 border-blue-600' : 'bg-white border-gray-300'}`}>
+                      {on && <span className="text-white text-[10px] font-black">✓</span>}
                     </div>
-                    <div>
-                      <p className="text-[11px] font-semibold text-white leading-none">{p.label}</p>
-                      <p className="text-[9px] text-white/35 mt-0.5" style={{fontFamily:'Tajawal,sans-serif'}}>{p.labelAr}</p>
-                    </div>
+                    <span className="text-xs font-medium text-gray-800">{p.icon} {p.label}</span>
                   </button>
                 )
               })}
             </div>
           </div>
 
+          {/* Dashboard config */}
+          <div className="mb-6 p-5 rounded-xl bg-blue-50 border border-blue-100">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-bold text-blue-900">📊 Dashboard Widgets</p>
+              <div className="flex gap-2">
+                <button onClick={enableAllDashboard} className="text-xs px-3 py-1 rounded-full font-semibold bg-blue-600 text-white hover:bg-blue-700 transition">Show All</button>
+                <button onClick={disableAllDashboard} className="text-xs px-3 py-1 rounded-full font-semibold bg-gray-200 text-gray-600 hover:bg-gray-300 transition">Hide All</button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              {DASHBOARD_WIDGETS.map(w => {
+                const on = dashboardConfig[w.key] !== false
+                return (
+                  <button key={w.key} onClick={() => toggleDashboard(w.key)}
+                    className={`flex items-center gap-2 p-2.5 rounded-xl text-left transition border ${on ? 'bg-white border-blue-300 shadow-sm' : 'bg-blue-50/50 border-transparent opacity-60 hover:opacity-100'}`}>
+                    <div className={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 border transition ${on ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-gray-300'}`}>
+                      {on && <span className="text-white text-[10px] font-black">✓</span>}
+                    </div>
+                    <span className="text-xs font-medium text-gray-800">{w.icon} {w.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-[10px] text-blue-400 mt-2">Control which widgets appear on this user's dashboard.</p>
+          </div>
+
           <div className="flex gap-3">
-            <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm text-white/40 border border-white/08 hover:border-white/20 transition">Cancel</button>
-            <button onClick={()=>onSave(form)}
-              className="flex-1 py-2.5 rounded-xl text-sm font-bold transition"
-              style={{background:'linear-gradient(135deg,#3b82f6,#2563eb)',color:'#fff',boxShadow:'0 4px 20px rgba(63, 186, 235,0.28)'}}>
-              💾 Save Changes
+            <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-medium text-gray-500 bg-gray-50 border border-gray-200 hover:bg-gray-100 transition">Cancel</button>
+            <button onClick={handleSave} disabled={busy}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition disabled:opacity-50"
+              style={{ background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', boxShadow: '0 4px 14px rgba(37,99,235,0.35)' }}>
+              {busy ? 'Saving…' : isNew ? '➕ Create User' : '💾 Save Changes'}
             </button>
           </div>
         </div>
@@ -166,202 +243,274 @@ function EditModal({user,onSave,onClose}:{user:User;onSave:(u:User)=>void;onClos
   )
 }
 
+function DeleteConfirm({ id, name, onConfirm, onClose }: { id: number; name: string; onConfirm: (id: number) => void; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(15,23,42,0.8)', backdropFilter: 'blur(4px)' }}>
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+        className="rounded-2xl p-6 max-w-sm w-full shadow-2xl bg-white border border-red-200">
+        <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4 mx-auto">🗑️</div>
+        <p className="text-lg font-bold text-gray-900 mb-2 text-center">Delete User</p>
+        <p className="text-sm text-gray-500 mb-1 text-center">Are you sure you want to delete</p>
+        <p className="text-sm font-semibold text-gray-800 mb-4 text-center break-all">"{name}"?</p>
+        <p className="text-xs text-red-500 mb-5 text-center bg-red-50 py-2 px-3 rounded-lg">This action is permanent and cannot be undone.</p>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-medium text-gray-600 bg-gray-50 border border-gray-200 hover:bg-gray-100 transition">Cancel</button>
+          <button onClick={() => onConfirm(id)} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition shadow-lg shadow-red-200">Delete Permanently</button>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
+
 export function UsersPage() {
-  const [users,setUsers]=useState<User[]>(SEED)
-  const [search,setSearch]=useState('')
-  const [roleFilter,setRoleFilter]=useState<Role|'all'>('all')
-  const [statusFilter,setStatusFilter]=useState<Status|'all'>('all')
-  const [editUser,setEditUser]=useState<User|null>(null)
-  const [delConfirm,setDelConfirm]=useState<number|null>(null)
-  const [showAdd,setShowAdd]=useState(false)
-  const [selected,setSelected]=useState<number[]>([])
+  const [tab, setTab] = useState<Tab>('users')
+  const [users, setUsers] = useState<ApiUser[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all')
+  const [statusFilter, setStatusFilter] = useState<Status | 'all'>('all')
+  const [editUser, setEditUser] = useState<ApiUser | null>(null)
+  const [showAdd, setShowAdd] = useState(false)
+  const [delId, setDelId] = useState<number | null>(null)
+  const [selected, setSelected] = useState<number[]>([])
+  const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
 
-  const NEW_USER: User={id:Date.now(),name:'',email:'',role:'student',status:'active',lastSeen:'Just now',phone:'',joinDate:new Date().toISOString().slice(0,10),accessFrom:'08:00',accessTo:'20:00',permissions:['classrooms','exams','messenger','homework']}
-
-  const filtered=useMemo(()=>users.filter(u=>{
-    const q=search.toLowerCase()
-    return (u.name.toLowerCase().includes(q)||u.email.toLowerCase().includes(q))
-      &&(roleFilter==='all'||u.role===roleFilter)
-      &&(statusFilter==='all'||u.status===statusFilter)
-  }),[users,search,roleFilter,statusFilter])
-
-  const saveUser=(u:User)=>{
-    setUsers(p=>{
-      const exists=p.find(x=>x.id===u.id)
-      return exists?p.map(x=>x.id===u.id?u:x):[...p,u]
-    })
-    setEditUser(null); setShowAdd(false)
+  const load = async () => {
+    setLoading(true)
+    try {
+      const r = await apiGet<{ users: ApiUser[] }>('/users')
+      setUsers(r.users)
+    } catch { setMsg({ kind: 'err', text: 'Failed to load users' }) }
+    finally { setLoading(false) }
   }
-  const delUser=(id:number)=>{setUsers(p=>p.filter(u=>u.id!==id));setDelConfirm(null)}
-  const toggleSel=(id:number)=>setSelected(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id])
-  const allSel=filtered.length>0&&filtered.every(u=>selected.includes(u.id))
+  useEffect(() => { load() }, [])
 
-  const roleCounts=(Object.keys(ROLE_CFG) as Role[]).reduce((a,r)=>({...a,[r]:users.filter(u=>u.role===r).length}),{} as Record<Role,number>)
+  const filtered = useMemo(() => users.filter(u => {
+    const q = search.toLowerCase()
+    return (u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+      && (roleFilter === 'all' || u.role === roleFilter)
+      && (statusFilter === 'all' || u.status === statusFilter)
+  }), [users, search, roleFilter, statusFilter])
+
+  const delUser = async (id: number) => {
+    try {
+      await apiDelete(`/users/${id}`)
+      setUsers(p => p.filter(u => u.id !== id))
+      setSelected(p => p.filter(x => x !== id))
+      setMsg({ kind: 'ok', text: 'User deleted' })
+    } catch { setMsg({ kind: 'err', text: 'Delete failed' }) }
+    setDelId(null)
+  }
+
+  const bulkDelete = async () => {
+    for (const id of selected) await apiDelete(`/users/${id}`).catch(() => {})
+    setUsers(p => p.filter(u => !selected.includes(u.id)))
+    setSelected([])
+    setMsg({ kind: 'ok', text: `${selected.length} users deleted` })
+  }
+
+  const roleCounts = (Object.keys(ROLE_CFG) as Role[]).reduce((a, r) => ({ ...a, [r]: users.filter(u => u.role === r).length }), {} as Record<Role, number>)
+  const allSel = filtered.length > 0 && filtered.every(u => selected.includes(u.id))
 
   return (
-    <div className="space-y-5 animate-fade-in">
-      {/* Page header */}
-      <div className="rounded-2xl p-5 relative overflow-hidden"
-        style={{background:'linear-gradient(135deg,#1d1668 0%,#131f40 100%)',border:'1px solid rgba(63, 186, 235,0.20)',boxShadow:'0 8px 32px rgba(8,15,34,0.30)'}}>
-        <div className="absolute top-0 right-0 w-56 h-full opacity-8 pointer-events-none"
-          style={{background:'radial-gradient(ellipse at right,#3b82f6,transparent)'}}/>
-        <div className="relative flex items-center justify-between flex-wrap gap-3">
+    <div className="space-y-5">
+      {/* Tabs */}
+      <div className="flex gap-1 p-1 rounded-2xl w-fit" style={{ background: 'var(--beige-light)', border: '1px solid var(--blue-pale)' }}>
+        <button onClick={() => setTab('users')}
+          className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-sm font-bold transition"
+          style={tab === 'users' ? { background: '#fff', color: '#2563eb', boxShadow: '0 2px 8px rgba(37,99,235,0.15)' } : { color: '#64748b' }}>
+          👥 Users
+        </button>
+        <button onClick={() => setTab('contacts')}
+          className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-sm font-bold transition"
+          style={tab === 'contacts' ? { background: '#fff', color: '#2563eb', boxShadow: '0 2px 8px rgba(37,99,235,0.15)' } : { color: '#64748b' }}>
+          📇 Contacts
+        </button>
+      </div>
+
+      {tab === 'contacts' ? (
+        <ContactsManager />
+      ) : (
+        <>
+      {msg && (
+        <div className={`px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between ${msg.kind === 'ok' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+          <span>{msg.text}</span>
+          <button onClick={() => setMsg(null)} className="ml-2 opacity-50 hover:opacity-100">✕</button>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="rounded-2xl p-6 bg-beige-white border border-blue-pale/60" style={{ boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}>
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h2 className="text-xl font-black text-white flex items-center gap-2">👥 Manage Users</h2>
-            <p className="text-xs text-indigo-300/50 mt-0.5">{users.length} total accounts · Full permission &amp; access control</p>
+            <h2 className="text-xl font-bold text-blue-deep">👥 User Management</h2>
+            <p className="text-sm text-blue-dark/60 mt-0.5 font-medium">{users.length} accounts · Full permission & dashboard control</p>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            {selected.length>0&&(
-              <button onClick={()=>{setUsers(p=>p.filter(u=>!selected.includes(u.id)));setSelected([])}}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold"
-                style={{background:'rgba(248,113,113,0.15)',color:'#f87171',border:'1px solid rgba(248,113,113,0.25)'}}>
-                🗑 Delete {selected.length}
-              </button>
+          <div className="flex gap-2">
+            {selected.length > 0 && (
+              <>
+                <button onClick={bulkDelete} className="px-3 py-2 rounded-xl text-sm font-bold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition">🗑 Delete {selected.length}</button>
+                <button onClick={() => setSelected([])} className="px-3 py-2 rounded-xl text-sm font-medium text-gray-500 bg-gray-50 border border-gray-200 hover:bg-gray-100 transition">Clear</button>
+              </>
             )}
-            <button onClick={()=>setShowAdd(true)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold"
-              style={{background:'linear-gradient(135deg,#3b82f6,#2563eb)',color:'#fff',boxShadow:'0 4px 16px rgba(63, 186, 235,0.28)'}}>
-              ＋ Add User
+            <button onClick={() => setShowAdd(true)} className="px-4 py-2 rounded-xl text-sm font-bold text-white shadow-lg transition" style={{ background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', boxShadow: '0 4px 14px rgba(37,99,235,0.35)' }}>
+              ＋ New User
             </button>
           </div>
         </div>
+
         {/* Role pills */}
         <div className="flex gap-2 mt-4 flex-wrap">
-          {(Object.keys(ROLE_CFG) as Role[]).map(r=>(
-            <button key={r} onClick={()=>setRoleFilter(v=>v===r?'all':r)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition"
-              style={{background:`${ROLE_CFG[r].color}${roleFilter===r?'20':'0d'}`,border:`1px solid ${ROLE_CFG[r].color}${roleFilter===r?'40':'20'}`}}>
-              <span className="text-xs">{ROLE_CFG[r].emoji}</span>
-              <span className="text-xs font-bold" style={{color:ROLE_CFG[r].color}}>{ROLE_CFG[r].label}</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold" style={{background:`${ROLE_CFG[r].color}15`,color:ROLE_CFG[r].color}}>{roleCounts[r]}</span>
+          {(Object.keys(ROLE_CFG) as Role[]).map(r => (
+            <button key={r} onClick={() => setRoleFilter(v => v === r ? 'all' : r)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition text-xs font-bold"
+              style={{
+                background: roleFilter === r ? ROLE_CFG[r].color : ROLE_CFG[r].bg,
+                color: roleFilter === r ? '#fff' : ROLE_CFG[r].color,
+                border: `1px solid ${roleFilter === r ? ROLE_CFG[r].color : 'transparent'}`,
+              }}>
+              <span>{ROLE_CFG[r].emoji}</span>
+              <span>{ROLE_CFG[r].label}</span>
+              <span className="text-[10px] ml-1 opacity-70">({roleCounts[r]})</span>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Search + status filter */}
+      {/* Search + filter */}
       <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-52">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 text-sm">🔍</span>
-          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search by name or email…"
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none transition"
-            style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',color:'white'}} />
+        <div className="relative flex-1 min-w-56">
+          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-blue-300 text-sm">🔍</span>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or email..."
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm outline-none bg-beige-white border border-blue-pale focus:border-blue-primary focus:ring-2 focus:ring-blue-ice text-blue-deep font-medium placeholder:text-blue-300 transition" />
         </div>
-        <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value as any)}
-          className="px-4 py-2.5 rounded-xl text-sm outline-none"
-          style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.08)',color:'rgba(255,255,255,0.7)'}}>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)}
+          className="px-4 py-2.5 rounded-xl text-sm outline-none bg-beige-white border border-blue-pale focus:border-blue-primary text-blue-deep font-medium">
           <option value="all">All Status</option>
           <option value="active">✅ Active</option>
           <option value="inactive">⏸ Inactive</option>
           <option value="suspended">🚫 Suspended</option>
         </select>
+        <button onClick={load} className="px-4 py-2.5 rounded-xl text-sm font-bold text-blue-primary bg-blue-ice border border-blue-pale hover:bg-blue-pale transition">↻ Refresh</button>
       </div>
 
       {/* Table */}
-      <div className="rounded-2xl overflow-hidden" style={{background:'rgba(8,14,32,0.90)',border:'1px solid rgba(255,255,255,0.06)',boxShadow:'0 4px 24px rgba(0,0,0,0.25)'}}>
-        {/* Header row */}
-        <div className="hidden md:grid px-4 py-3 text-[9px] font-bold uppercase tracking-widest border-b"
-          style={{gridTemplateColumns:'36px 220px 1fr 100px 90px 120px 100px 80px',borderColor:'rgba(255,255,255,0.05)',color:'rgba(255,255,255,0.25)'}}>
-          <div>
-            <input type="checkbox" checked={allSel} onChange={e=>setSelected(e.target.checked?filtered.map(u=>u.id):[])} className="accent-indigo-500 cursor-pointer" />
-          </div>
-          <div>User</div><div>Contact</div><div>Role</div>
-          <div>Status</div><div>Access Hours</div><div>Last Seen</div><div>Actions</div>
+      <div className="rounded-xl overflow-hidden bg-beige-white border border-blue-pale/60" style={{ boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}>
+        {/* Header */}
+        <div className="hidden md:grid px-4 py-3 text-xs font-bold uppercase tracking-wider border-b border-blue-pale text-blue-deep"
+          style={{ gridTemplateColumns: '32px minmax(180px,1fr) minmax(160px,1fr) 90px 80px 130px 100px 100px 80px' }}>
+          <div><input type="checkbox" checked={allSel} onChange={e => setSelected(e.target.checked ? filtered.map(u => u.id) : [])} className="accent-blue-600 cursor-pointer" /></div>
+          <div>User</div><div>Contact</div><div>Role</div><div>Status</div><div>Access</div><div>Last Seen</div><div>App</div><div>Actions</div>
         </div>
 
-        <AnimatePresence>
-          {filtered.map((u,i)=>{
-            const rc=ROLE_CFG[u.role]; const sc=STATUS_CFG[u.status]; const isSel=selected.includes(u.id)
-            return (
-              <motion.div key={u.id} initial={{opacity:0,y:4}} animate={{opacity:1,y:0}} exit={{opacity:0,x:-20}}
-                transition={{delay:i*0.02}}
-                className="px-4 py-3 border-b hover:bg-white/[0.025] transition group cursor-default"
-                style={{borderColor:'rgba(255,255,255,0.04)',background:isSel?'rgba(63, 186, 235,0.08)':undefined}}>
-                {/* Mobile layout */}
-                <div className="flex md:hidden items-center gap-3 mb-2">
-                  <input type="checkbox" checked={isSel} onChange={()=>toggleSel(u.id)} className="accent-indigo-500" />
-                  <Avatar name={u.name} role={u.role} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-white truncate">{u.name}</p>
-                    <p className="text-[10px] text-white/40 truncate">{u.email}</p>
-                  </div>
-                  <div className="flex gap-1">
-                    <button onClick={()=>setEditUser(u)} className="p-1.5 rounded-lg text-indigo-400 hover:bg-indigo-500/20">✏️</button>
-                    <button onClick={()=>setDelConfirm(u.id)} className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/20">🗑</button>
-                  </div>
-                </div>
-                {/* Desktop grid */}
-                <div className="hidden md:grid items-center gap-2"
-                  style={{gridTemplateColumns:'36px 220px 1fr 100px 90px 120px 100px 80px'}}>
-                  <input type="checkbox" checked={isSel} onChange={()=>toggleSel(u.id)} className="accent-indigo-500 cursor-pointer" />
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <Avatar name={u.name} role={u.role} />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-white truncate">{u.name}</p>
-                      <p className="text-[9px] text-white/30 truncate">{u.grade||u.courses?.[0]||(u.classrooms?`${u.classrooms} rooms`:'')}</p>
+        {loading ? (
+          <div className="py-16 text-center text-sm font-semibold text-blue-dark">Loading users…</div>
+        ) : filtered.length === 0 ? (
+          <div className="py-16 text-center">
+            <p className="text-3xl mb-2">🔍</p>
+            <p className="text-sm font-semibold text-blue-dark">No users match your filters</p>
+          </div>
+        ) : (
+          <AnimatePresence>
+            {filtered.map((u, i) => {
+              const rc = ROLE_CFG[u.role]; const sc = STATUS_CFG[u.status]; const isSel = selected.includes(u.id)
+              return (
+                <motion.div key={u.id} initial={{ opacity: 0, y: 2 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -10 }}
+                  transition={{ delay: i * 0.015 }}
+                  className={`px-4 py-3 border-b border-blue-pale/30 hover:bg-beige transition cursor-default ${isSel ? 'bg-blue-ice' : ''}`}>
+                  {/* Mobile */}
+                  <div className="flex md:hidden items-center gap-3 mb-2">
+                    <input type="checkbox" checked={isSel} onChange={() => setSelected(s => s.includes(u.id) ? s.filter(x => x !== u.id) : [...s, u.id])} className="accent-blue-600" />
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0" style={{ background: rc.bg, color: rc.color }}>{u.name.charAt(0)}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-blue-deep truncate">{u.name}</p>
+                      <p className="text-xs text-blue-dark/60 truncate font-medium">{u.email}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      {u.role === 'student' && (
+                        <a href={`/app-download?name=${encodeURIComponent(u.name)}&uid=${u.id}`} target="_blank" rel="noopener noreferrer"
+                          className="p-1.5 rounded-lg transition" title="Download App"
+                          style={{ color: '#D4A017' }}>📱</a>
+                      )}
+                      <button onClick={() => setEditUser(u)} className="p-1.5 rounded-lg text-blue-primary hover:bg-blue-ice transition">✏️</button>
+                      <button onClick={() => setDelId(u.id)} className="p-1.5 rounded-lg text-orange hover:bg-orange-pale transition">🗑️</button>
                     </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-white/55 truncate">{u.email}</p>
-                    <p className="text-[9px] text-white/25 truncate">{u.phone}</p>
+                  {/* Desktop */}
+                  <div className="hidden md:grid items-center gap-2" style={{ gridTemplateColumns: '32px minmax(180px,1fr) minmax(160px,1fr) 90px 80px 130px 100px 100px 80px' }}>
+                    <input type="checkbox" checked={isSel} onChange={() => setSelected(s => s.includes(u.id) ? s.filter(x => x !== u.id) : [...s, u.id])} className="accent-blue-600 cursor-pointer" />
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0" style={{ background: rc.bg, color: rc.color }}>{u.name.charAt(0)}</div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-blue-deep truncate">{u.name}</p>
+                        <p className="text-xs text-blue-dark/60 truncate font-medium">{u.role === 'student' ? 'Student' : u.role === 'teacher' ? 'Teacher' : u.role === 'parent' ? 'Parent' : u.role}</p>
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm text-blue-deep font-semibold truncate">{u.email}</p>
+                      <p className="text-xs text-gray-500 font-medium truncate">{u.phone || '—'}</p>
+                    </div>
+                    <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full w-fit" style={{ background: rc.bg, color: rc.color }}>{rc.emoji} {rc.label}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full" style={{ background: sc.dot }} />
+                      <span className="text-xs font-bold" style={{ color: sc.color }}>{sc.label}</span>
+                    </div>
+                    <div className="text-xs text-gray-600 font-mono font-medium">
+                      {u.accessFrom} — {u.accessTo}
+                    </div>
+                    <div className="text-xs text-gray-500 font-medium">{u.lastSeen || '—'}</div>
+                    {/* Mobile app download */}
+                    <div className="flex justify-center">
+                      {u.role === 'student' ? (
+                        <a href={`/app-download?name=${encodeURIComponent(u.name)}&uid=${u.id}`}
+                          target="_blank" rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold transition"
+                          style={{ background: 'rgba(212,160,23,0.08)', color: '#D4A017', border: '1px solid rgba(212,160,23,0.15)' }}
+                          title="Download Student App">
+                          📱 App
+                        </a>
+                      ) : (
+                        <span className="text-[10px] text-gray-500">—</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setEditUser(u)} title="Edit" className="p-1.5 rounded-lg text-blue-primary hover:bg-blue-ice transition text-xs">✏️</button>
+                      <button onClick={() => setDelId(u.id)} title="Delete" className="p-1.5 rounded-lg text-orange hover:bg-orange-pale transition text-xs">🗑️</button>
+                    </div>
                   </div>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full w-fit"
-                    style={{background:rc.bg,color:rc.color}}>{rc.emoji} {rc.label}</span>
-                  <div className="flex items-center gap-1.5">
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${sc.dot}`} />
-                    <span className="text-xs font-medium" style={{color:sc.color}}>{sc.label}</span>
-                  </div>
-                  <div className="text-[10px] text-white/35">
-                    {u.accessFrom??'07:00'} — {u.accessTo??'22:00'}
-                  </div>
-                  <div className="text-xs text-white/35">{u.lastSeen}</div>
-                  <div className="flex items-center gap-1">
-                    <button onClick={()=>setEditUser(u)} title="Edit user" className="p-1.5 rounded-lg text-indigo-400 hover:bg-indigo-500/20 transition text-sm">✏️</button>
-                    <button onClick={()=>setDelConfirm(u.id)} title="Delete user" className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/20 transition text-sm">🗑</button>
-                  </div>
-                </div>
-              </motion.div>
-            )
-          })}
-        </AnimatePresence>
-
-        {filtered.length===0&&(
-          <div className="py-20 text-center">
-            <p className="text-4xl mb-3">🔍</p>
-            <p className="text-sm text-white/30">No users match your filters</p>
-          </div>
+                </motion.div>
+              )
+            })}
+          </AnimatePresence>
         )}
       </div>
 
-      <p className="text-xs text-white/25 text-center">
-        {filtered.length} of {users.length} users shown{selected.length>0&&` · ${selected.length} selected`}
-      </p>
+      {/* Footer */}
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-blue-deep font-semibold">{filtered.length} of {users.length} users shown{selected.length > 0 && ` · ${selected.length} selected`}</span>
+        <div className="flex gap-4 text-blue-dark font-medium">
+          <span>👑 Admin {roleCounts.admin}</span>
+          <span>👩‍🏫 Teacher {roleCounts.teacher}</span>
+          <span>🔭 Supervisor {roleCounts.supervisor}</span>
+          <span>🎓 Student {roleCounts.student}</span>
+          <span>👪 Parent {roleCounts.parent}</span>
+        </div>
+      </div>
 
+      {/* Modals */}
       <AnimatePresence>
-        {(editUser||showAdd)&&<EditModal user={editUser??{...NEW_USER,id:Date.now()}} onSave={saveUser} onClose={()=>{setEditUser(null);setShowAdd(false)}} />}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {delConfirm!==null&&(
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{background:'rgba(0,0,0,0.75)'}}>
-            <motion.div initial={{opacity:0,scale:0.95}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:0.95}}
-              className="rounded-2xl p-6 max-w-sm w-full shadow-2xl"
-              style={{background:'#1d1668',border:'1px solid rgba(248,113,113,0.30)'}}>
-              <p className="text-xl mb-1">🗑</p>
-              <p className="text-lg font-black text-white mb-2">Delete this user?</p>
-              <p className="text-sm text-white/45 mb-6">This action is permanent and cannot be undone.</p>
-              <div className="flex gap-3">
-                <button onClick={()=>setDelConfirm(null)} className="flex-1 py-2.5 rounded-xl text-sm text-white/40 border border-white/10 hover:border-white/20 transition">Cancel</button>
-                <button onClick={()=>delUser(delConfirm!)}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-bold"
-                  style={{background:'linear-gradient(135deg,#dc2626,#ef4444)',color:'#fff',boxShadow:'0 4px 16px rgba(220,38,38,0.28)'}}>
-                  Delete Permanently
-                </button>
-              </div>
-            </motion.div>
-          </div>
+        {(editUser || showAdd) && (
+          <UserModal user={editUser} onSave={() => { load(); setEditUser(null); setShowAdd(false); setMsg({ kind: 'ok', text: 'User saved' }) }} onClose={() => { setEditUser(null); setShowAdd(false) }} />
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {delId !== null && (
+          <DeleteConfirm id={delId!} name={users.find(u => u.id === delId)?.name ?? ''} onConfirm={delUser} onClose={() => setDelId(null)} />
+        )}
+      </AnimatePresence>
+        </>
+      )}
     </div>
   )
 }

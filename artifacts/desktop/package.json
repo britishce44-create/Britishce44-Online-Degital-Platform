@@ -1,0 +1,63 @@
+{
+  "name": "@workspace/britishce44-desktop",
+  "version": "1.0.0",
+  "description": "Britishce44 Online Digital Platform — Desktop Application",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "dev": "electron .",
+    "build": "electron-builder --win --x64",
+    "build:all": "electron-builder --win --x64 --linux --mac",
+    "typecheck": "node -e \"require('./main.js')\""
+  },
+  "build": {
+    "appId": "com.britishce44.desktop",
+    "productName": "Britishce44",
+    "directories": {
+      "output": "dist-installer"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "public/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../api-server",
+        "to": "api-server",
+        "filter": ["dist/**/*", "package.json"]
+      },
+      {
+        "from": "../britishce44/dist",
+        "to": "frontend"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "public/icon.ico",
+      "publisherName": "Britishce44"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Britishce44",
+      "installerIcon": "public/icon.ico",
+      "uninstallerIcon": "public/icon.ico",
+      "installerHeaderIcon": "public/icon.ico",
+      "runAfterFinish": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.0"
+  }
+}

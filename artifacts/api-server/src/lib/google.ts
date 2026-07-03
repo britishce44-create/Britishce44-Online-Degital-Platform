@@ -1,49 +1,19 @@
 import { and, eq, or } from "drizzle-orm";
 import { db, reports, type Report } from "@workspace/db";
 import { addDaysISO } from "./teaching-days";
+import { google } from "googleapis";
 import { logger } from "./logger";
-
-// Connector names as known to the Replit connectors proxy.
-const GMAIL = "google-mail";
-const DRIVE = "google-drive";
-const CALENDAR = "google-calendar";
 
 const SENDER = "britishce44@gmail.com";
 
-interface ConnSettings {
-  access_token?: string;
-  oauth?: { credentials?: { access_token?: string } };
-  [k: string]: unknown;
-}
-
-function replitToken(): string | null {
-  if (process.env.REPL_IDENTITY) return `repl ${process.env.REPL_IDENTITY}`;
-  if (process.env.WEB_REPL_RENEWAL) return `depl ${process.env.WEB_REPL_RENEWAL}`;
-  return null;
-}
-
-// Fetch a connector's settings (including the live access token) from the
-// Replit connectors proxy. Returns null when the integration is not connected.
-async function getConnector(name: string): Promise<ConnSettings | null> {
-  const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-  const token = replitToken();
-  if (!hostname || !token) return null;
-  try {
-    const res = await fetch(
-      `https://${hostname}/api/v2/connection?include_secrets=true&connector_names=${name}`,
-      { headers: { Accept: "application/json", X_REPLIT_TOKEN: token } },
-    );
-    if (!res.ok) return null;
-    const data = (await res.json()) as { items?: { settings?: ConnSettings }[] };
-    return data.items?.[0]?.settings ?? null;
-  } catch (err) {
-    logger.warn({ err, name }, "connector lookup failed");
-    return null;
-  }
-}
-
-function accessToken(s: ConnSettings | null): string | null {
-  return s?.access_token || s?.oauth?.credentials?.access_token || null;
+function getOAuth2Client(): typeof google.auth.OAuth2.prototype | null {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+  if (!clientId || !clientSecret || !refreshToken) return null;
+  const auth = new google.auth.OAuth2(clientId, clientSecret);
+  auth.setCredentials({ refresh_token: refreshToken });
+  return auth;
 }
 
 export interface GoogleStatus {
@@ -55,41 +25,25 @@ export interface GoogleStatus {
 }
 
 export async function googleStatus(): Promise<GoogleStatus> {
-  const [m, d, c] = await Promise.all([
-    getConnector(GMAIL),
-    getConnector(DRIVE),
-    getConnector(CALENDAR),
-  ]);
-  const gmail = !!accessToken(m);
-  const drive = !!accessToken(d);
-  const calendar = !!accessToken(c);
-  return { gmail, drive, calendar, connected: gmail || drive || calendar, sender: SENDER };
+  const client = getOAuth2Client();
+  return { gmail: !!client, drive: !!client, calendar: !!client, connected: !!client, sender: SENDER };
 }
 
-async function gmailClient(): Promise<any | null> {
-  const token = accessToken(await getConnector(GMAIL));
-  if (!token) return null;
-  const { google } = await import("googleapis");
-  const auth = new google.auth.OAuth2();
-  auth.setCredentials({ access_token: token });
+async function gmailClient(): Promise<typeof google.gmail.prototype | null> {
+  const auth = getOAuth2Client();
+  if (!auth) return null;
   return google.gmail({ version: "v1", auth });
 }
 
-async function driveClient(): Promise<any | null> {
-  const token = accessToken(await getConnector(DRIVE));
-  if (!token) return null;
-  const { google } = await import("googleapis");
-  const auth = new google.auth.OAuth2();
-  auth.setCredentials({ access_token: token });
+async function driveClient(): Promise<typeof google.drive.prototype | null> {
+  const auth = getOAuth2Client();
+  if (!auth) return null;
   return google.drive({ version: "v3", auth });
 }
 
-async function calendarClient(): Promise<any | null> {
-  const token = accessToken(await getConnector(CALENDAR));
-  if (!token) return null;
-  const { google } = await import("googleapis");
-  const auth = new google.auth.OAuth2();
-  auth.setCredentials({ access_token: token });
+async function calendarClient(): Promise<typeof google.calendar.prototype | null> {
+  const auth = getOAuth2Client();
+  if (!auth) return null;
   return google.calendar({ version: "v3", auth });
 }
 
@@ -114,7 +68,7 @@ function buildMime(to: string, subject: string, body: string): string {
 }
 
 async function ensureDriveFolder(
-  drive: any,
+  drive: ReturnType<typeof google.drive>,
   name: string,
   parentId?: string,
 ): Promise<string> {

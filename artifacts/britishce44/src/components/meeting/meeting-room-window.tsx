@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWebRTC } from '@/components/webrtc/webrtc-provider'
+import { PlacementsPage } from '@/pages/placements'
 
 /* ─── types ─────────────────────────────────────────────── */
 type ResizeDir = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
@@ -41,9 +42,15 @@ function VideoTile({
 interface Props {
   studentName?: string
   onClose: () => void
+  isInterview?: boolean
+  isSupervisor?: boolean
+  interviewNewcomerId?: string
+  onPlacementTestGranted?: () => void
 }
 
-export function MeetingRoomWindow({ studentName, onClose }: Props) {
+export function MeetingRoomWindow({
+  studentName, onClose, isInterview, isSupervisor, interviewNewcomerId, onPlacementTestGranted,
+}: Props) {
   const {
     isConnected, isMuted, isCameraOn, isScreenSharing,
     localStream, remoteParticipants,
@@ -70,10 +77,34 @@ export function MeetingRoomWindow({ studentName, onClose }: Props) {
   ])
   const [notes, setNotes] = useState('')
   const [mediaError, setMediaError] = useState<string | null>(null)
+  const [placementTestGranted, setPlacementTestGranted] = useState(false)
 
   /* ── drag refs ── */
   const dragRef   = useRef<{ mx: number; my: number; px: number; py: number } | null>(null)
   const resizeRef = useRef<{ dir: ResizeDir; mx: number; my: number; px: number; py: number; pw: number; ph: number } | null>(null)
+
+  /* ── placement test listener (interviewee side) ── */
+  useEffect(() => {
+    if (!isInterview || isSupervisor || !interviewNewcomerId) return
+    const key = `placementTest_granted_${interviewNewcomerId}`
+    const check = () => {
+      if (localStorage.getItem(key) === 'true') {
+        setPlacementTestGranted(true)
+      }
+    }
+    check()
+    const interval = setInterval(check, 1500)
+    return () => clearInterval(interval)
+  }, [isInterview, isSupervisor, interviewNewcomerId])
+
+  /* ── supervisor: write grant to localStorage ── */
+  useEffect(() => {
+    if (!isInterview || !isSupervisor || !interviewNewcomerId) return
+    const key = `placementTest_granted_${interviewNewcomerId}`
+    if (placementTestGranted) {
+      localStorage.setItem(key, 'true')
+    }
+  }, [placementTestGranted, isInterview, isSupervisor, interviewNewcomerId])
 
   /* ── join on mount ── */
   useEffect(() => {
@@ -386,6 +417,35 @@ export function MeetingRoomWindow({ studentName, onClose }: Props) {
                 {recording ? '⏹' : '⏺'}
               </CtrlBtn>
 
+              {isInterview && isSupervisor && (
+                <>
+                  <Sep />
+                  <button
+                    onClick={() => {
+                      if (onPlacementTestGranted) {
+                        setPlacementTestGranted(true)
+                        onPlacementTestGranted()
+                      }
+                    }}
+                    title="Grant Placement Test"
+                    style={{
+                      height: 40, borderRadius: 12, border: 'none',
+                      background: 'linear-gradient(135deg,#D4A017,#F5C518)',
+                      color: '#17125c', fontSize: 11, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      padding: '0 12px',
+                      fontWeight: 900,
+                      boxShadow: '0 3px 10px rgba(212,160,23,0.35)',
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.07)' }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+                  >
+                    🎯 Grant Placement Test
+                  </button>
+                </>
+              )}
+
               <Sep />
 
               {/* End call */}
@@ -461,6 +521,31 @@ export function MeetingRoomWindow({ studentName, onClose }: Props) {
               </motion.div>
             )}
           </AnimatePresence>
+        </div>
+      )}
+
+      {/* ── PLACEMENT TEST OVERLAY (interviewee side) ── */}
+      {isInterview && !isSupervisor && placementTestGranted && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 999,
+          background: '#0a1628', borderRadius: 18,
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '8px 16px',
+            background: 'linear-gradient(135deg,#D4A017,#F5C518)',
+          }}>
+            <span style={{ fontSize: 13, fontWeight: 900, color: '#17125c' }}>
+              🎯 Placement Test — Granted by Supervisor
+            </span>
+            <span style={{ fontSize: 10, color: '#17125c', opacity: 0.7 }}>
+              Your answers will auto-save
+            </span>
+          </div>
+          <div style={{ flex: 1, overflow: 'auto', background: '#f0f4ff' }}>
+            <PlacementsPage />
+          </div>
         </div>
       )}
     </motion.div>

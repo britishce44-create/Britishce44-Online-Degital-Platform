@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useMaintenanceMode } from '../maintenance/maintenance-provider'
+import { FEATURES, modeLabel } from '@/lib/config'
 import { useI18n } from '@/lib/i18n'
 
 interface TopBarProps {
@@ -22,7 +23,7 @@ export function TopBar({ user, onLogout, onToggleSidebar }: TopBarProps) {
   return (
     <header className="h-14 bg-[#17125c] flex items-center justify-between px-4 flex-shrink-0 z-30 relative select-none">
       {/* Accent gradient line */}
-      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-indigo-700 via-sky-500 to-emerald-400" />
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-golden via-blue-500 to-golden-bright" />
 
       {/* Left: Logo + toggle */}
       <div className="flex items-center gap-3">
@@ -36,15 +37,21 @@ export function TopBar({ user, onLogout, onToggleSidebar }: TopBarProps) {
         {/* Logo */}
         <div className="flex items-center gap-2.5">
           <div className="relative">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-emerald-400 via-emerald-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30 flex-shrink-0">
+            <div className="w-8 h-8 rounded-xl golden-gradient flex items-center justify-center shadow-lg shadow-golden/30 flex-shrink-0">
               <span className="text-white font-black text-xs">B</span>
             </div>
-            <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-[#17125c] animate-pulse" />
+            <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-golden-bright border-2 border-[#17125c] animate-pulse" />
           </div>
           <div>
             <span className="text-white font-bold text-sm tracking-wide">Britishce44</span>
-            <p className="text-[9px] text-blue-300/50 leading-none hidden md:block">{t('chrome.platformTag')}</p>
+            <p className="text-[9px] text-golden-bright/60 leading-none hidden md:block font-medium">{t('chrome.platformTag')}</p>
           </div>
+        </div>
+
+        {/* Mode badge */}
+        <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full border ${FEATURES.onlineMode ? 'bg-emerald-500/15 border-emerald-500/30' : 'bg-blue-500/15 border-blue-500/30'}`}>
+          <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${FEATURES.onlineMode ? 'bg-emerald-400' : 'bg-blue-400'}`} />
+          <span className={`text-[10px] font-bold tracking-wide ${FEATURES.onlineMode ? 'text-emerald-400' : 'text-blue-400'}`}>{modeLabel()}</span>
         </div>
 
         {/* Maintenance mode badge */}
@@ -110,7 +117,7 @@ export function TopBar({ user, onLogout, onToggleSidebar }: TopBarProps) {
 
         {user && (
           <>
-            <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-full transition text-sm" title={t('topbar.notifications')}>
+            <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-golden hover:bg-golden/10 rounded-full transition text-sm" title={t('topbar.notifications')}>
               🔔
             </button>
             <div className="flex items-center gap-2 pl-2 border-l border-white/10">

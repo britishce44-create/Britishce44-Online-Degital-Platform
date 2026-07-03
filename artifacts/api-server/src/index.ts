@@ -4,6 +4,8 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { seedIfEmpty, seedEval } from "./lib/seed";
 import { tick, startScheduler } from "./lib/scheduler";
+import { mediaSoupManager } from "./mediasoup/MediaSoupManager";
+import { attachSignalingNamespace } from "./mediasoup/SignalingNamespace";
 
 const rawPort = process.env["PORT"];
 
@@ -35,6 +37,10 @@ const io = new SocketIOServer(httpServer, {
   cors: { origin: "*", methods: ["GET", "POST"] },
   transports: ["websocket", "polling"],
 });
+
+(globalThis as any).__socketIO = io;
+
+attachSignalingNamespace(io);
 
 io.on("connection", (socket) => {
   let currentRoom: string | null = null;
@@ -133,6 +139,12 @@ async function boot(): Promise<void> {
     await seedEval();
     await tick();
     startScheduler();
+    try {
+      await mediaSoupManager.init();
+      logger.info("Mediasoup worker initialized successfully");
+    } catch (err) {
+      logger.warn({ err }, "Mediasoup initialization skipped — video classrooms unavailable in this environment");
+    }
   } catch (err) {
     logger.error({ err }, "Boot tasks failed");
   }

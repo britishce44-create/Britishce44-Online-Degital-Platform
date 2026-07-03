@@ -1,15 +1,34 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react'
 
+export interface NewcomerData {
+  id: string;
+  firstName: string;
+  lastName: string;
+  age: string;
+  city: string;
+  country: string;
+  gmail: string;
+  callPhone: string;
+  whatsappPhone: string;
+  registeredAt: string;
+  status: 'waiting' | 'in-interview' | 'completed' | 'enrolled';
+}
+
 interface User {
   id: string; email: string; firstName: string; lastName: string;
-  role: 'admin' | 'supervisor' | 'teacher' | 'student' | 'parent';
+  role: 'admin' | 'supervisor' | 'teacher' | 'student' | 'parent' | 'newcomer';
   phone?: string; grade?: number; classroomId?: number;
+  dashboardConfig?: Record<string, boolean>;
+  newcomerData?: NewcomerData;
 }
 
 interface AuthContextType {
   user: User | null; isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void; register: (data: Partial<User> & { password: string }) => Promise<void>;
+  registerNewcomer: (data: NewcomerData) => Promise<void>;
+  getNewcomers: () => NewcomerData[];
+  updateNewcomerStatus: (id: string, status: NewcomerData['status']) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -21,7 +40,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const stored = localStorage.getItem('b44_user')
     if (stored) {
-      try { setUser(JSON.parse(stored)) } catch { localStorage.removeItem('b44_user') }
+      try {
+        const parsed = JSON.parse(stored)
+        // Newcomer registrations are form submissions only — do not restore as logged-in user.
+        if (parsed?.role === 'newcomer') {
+          localStorage.removeItem('b44_user')
+        } else {
+          setUser(parsed)
+        }
+      } catch { localStorage.removeItem('b44_user') }
     }
     setIsLoading(false)
   }, [])
@@ -33,9 +60,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     if (!response.ok) throw new Error('Invalid credentials')
     const data = await response.json()
+    const userWithConfig = {
+      ...data.user,
+      dashboardConfig: data.dashboardConfig ?? Object.fromEntries(
+        ['overview','courses','schedule','tasks','notifications','recentActivity','performance','attendance','messages','announcements'].map(k => [k, true])
+      ),
+    }
     localStorage.setItem('b44_token', data.accessToken)
-    localStorage.setItem('b44_user', JSON.stringify(data.user))
-    setUser(data.user)
+    localStorage.setItem('b44_user', JSON.stringify(userWithConfig))
+    setUser(userWithConfig)
   }, [])
 
   const logout = useCallback(() => {
@@ -55,8 +88,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const registerNewcomer = useCallback(async (data: NewcomerData) => {
+    const id = `newcomer-${Date.now()}`
+    const newcomer: NewcomerData = { ...data, id }
+    const existing = JSON.parse(localStorage.getItem('b44_newcomers') || '[]')
+    existing.push(newcomer)
+    localStorage.setItem('b44_newcomers', JSON.stringify(existing))
+    // Do NOT set as current user — newcomer registration is just a form submission.
+    // The user should stay on the login page to sign in with their credentials.
+  }, [])
+
+  const getNewcomers = useCallback((): NewcomerData[] => {
+    return JSON.parse(localStorage.getItem('b44_newcomers') || '[]')
+  }, [])
+
+  const updateNewcomerStatus = useCallback((id: string, status: NewcomerData['status']) => {
+    const existing: NewcomerData[] = JSON.parse(localStorage.getItem('b44_newcomers') || '[]')
+    const updated = existing.map(n => n.id === id ? { ...n, status } : n)
+    localStorage.setItem('b44_newcomers', JSON.stringify(updated))
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, register }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout, register, registerNewcomer, getNewcomers, updateNewcomerStatus }}>
       {children}
     </AuthContext.Provider>
   )

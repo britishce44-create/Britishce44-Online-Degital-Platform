@@ -4,3 +4,7 @@ export * from "./courses";
 export * from "./assessment";
 export * from "./eval";
 export * from "./ops";
+export * from "./attendance";
+export * from "./results";
+export * from "./contacts";
+export * from "./quizzes";

@@ -80,7 +80,46 @@
   --champagne: #e9fbf4;       /* soft mint (logo green tint) */
   --ivory: #f5fbff;           /* cool white */
 
-  /* ── Varied Accents ── */
+  /* ── Design Palette — Blues · Golden · Orange · Beige · Light Gray ── */
+  /* Blues — full spectrum */
+  --blue-deep: #1e3a8a;       /* deep navy blue */
+  --blue-dark: #1d4ed8;       /* dark blue */
+  --blue-primary: #2563eb;    /* primary blue */
+  --blue-bright: #3b82f6;    /* bright blue */
+  --blue-sky: #60a5fa;       /* sky blue */
+  --blue-light: #93c5fd;     /* light blue */
+  --blue-pale: #bfdbfe;      /* pale blue */
+  --blue-ice: #dbeafe;        /* ice blue */
+
+  /* Golden — true gold/yellow tones */
+  --golden-deep: #b8860b;    /* dark goldenrod */
+  --golden: #D4A017;          /* golden */
+  --golden-bright: #F5C518;  /* bright golden */
+  --golden-light: #FFD700;   /* gold */
+  --golden-pale: #FFF8DC;    /* cornsilk */
+  --golden-glow: #FFD700;
+
+  /* Orange */
+  --orange-deep: #c2410c;
+  --orange: #f97316;
+  --orange-bright: #fb923c;
+  --orange-light: #fdba74;
+  --orange-pale: #ffedd5;
+
+  /* Beige */
+  --beige-dark: #e8d5b7;
+  --beige: #f5e6d3;
+  --beige-light: #faf3e8;
+  --beige-pale: #fdf8f0;
+  --beige-white: #fffbf5;
+
+  /* Light Gray */
+  --gray-lightest: #f8fafc;
+  --gray-lighter: #f1f5f9;
+  --gray-light: #e2e8f0;
+  --gray-soft: #cbd5e1;
+
+  /* --gold is actually emerald green (logo-matched), keep as is */
   --accent-indigo: #2563eb;   /* royal-blue family (logo) */
   --accent-violet: #2563eb;   /* purple — variation */
   --accent-emerald: #00ae74;  /* green — variation */
@@ -427,6 +466,7 @@
 
 @layer utilities {
   /* ── Brand color utilities ── */
+  /* Extended palette text colors */
   .text-navy { color: var(--navy); }
   .text-royal-blue { color: var(--royal-blue); }
   .text-gold { color: var(--gold); }
@@ -434,7 +474,20 @@
   .text-ivory { color: var(--ivory); }
   .text-indigo { color: var(--accent-indigo); }
   .text-violet { color: var(--accent-violet); }
+  .text-golden { color: var(--golden); }
+  .text-golden-bright { color: var(--golden-bright); }
+  .text-golden-deep { color: var(--golden-deep); }
+  .text-orange { color: var(--orange); }
+  .text-orange-deep { color: var(--orange-deep); }
+  .text-blue-deep { color: var(--blue-deep); }
+  .text-blue-dark { color: var(--blue-dark); }
+  .text-blue-primary { color: var(--blue-primary); }
+  .text-blue-bright { color: var(--blue-bright); }
+  .text-blue-sky { color: var(--blue-sky); }
+  .text-beige { color: var(--beige-dark); }
+  .text-gray-lightest { color: var(--gray-lightest); }
 
+  /* Extended palette background utilities */
   .bg-navy { background-color: var(--navy); }
   .bg-royal-blue { background-color: var(--royal-blue); }
   .bg-gold { background-color: var(--gold); }
@@ -442,30 +495,105 @@
   .bg-ivory { background-color: var(--ivory); }
   .bg-surface-1 { background-color: var(--surface-1); }
   .bg-surface-2 { background-color: var(--surface-2); }
+  .bg-golden { background-color: var(--golden); }
+  .bg-golden-bright { background-color: var(--golden-bright); }
+  .bg-golden-light { background-color: var(--golden-light); }
+  .bg-golden-pale { background-color: var(--golden-pale); }
+  .bg-orange { background-color: var(--orange); }
+  .bg-orange-bright { background-color: var(--orange-bright); }
+  .bg-orange-light { background-color: var(--orange-light); }
+  .bg-orange-pale { background-color: var(--orange-pale); }
+  .bg-beige { background-color: var(--beige); }
+  .bg-beige-light { background-color: var(--beige-light); }
+  .bg-beige-pale { background-color: var(--beige-pale); }
+  .bg-beige-white { background-color: var(--beige-white); }
+  .bg-blue-deep { background-color: var(--blue-deep); }
+  .bg-blue-dark { background-color: var(--blue-dark); }
+  .bg-blue-primary { background-color: var(--blue-primary); }
+  .bg-blue-bright { background-color: var(--blue-bright); }
+  .bg-blue-sky { background-color: var(--blue-sky); }
+  .bg-blue-light { background-color: var(--blue-light); }
+  .bg-blue-pale { background-color: var(--blue-pale); }
+  .bg-blue-ice { background-color: var(--blue-ice); }
+  .bg-gray-lightest { background-color: var(--gray-lightest); }
+  .bg-gray-lighter { background-color: var(--gray-lighter); }
+  .bg-gray-light { background-color: var(--gray-light); }
 
+  /* Border utilities */
   .border-gold { border-color: var(--gold); }
   .border-champagne { border-color: var(--champagne); }
   .border-indigo { border-color: var(--accent-indigo); }
   .border-l-3 { border-left-width: 3px; }
+  .border-golden { border-color: var(--golden); }
+  .border-golden-bright { border-color: var(--golden-bright); }
+  .border-orange { border-color: var(--orange); }
+  .border-beige { border-color: var(--beige-dark); }
+  .border-blue-deep { border-color: var(--blue-deep); }
+  .border-blue-primary { border-color: var(--blue-primary); }
+  .border-blue-bright { border-color: var(--blue-bright); }
+  .border-blue-sky { border-color: var(--blue-sky); }
+  .border-blue-light { border-color: var(--blue-light); }
+  .border-blue-pale { border-color: var(--blue-pale); }
 
   .ring-gold { --tw-ring-color: var(--gold); }
+  .ring-golden { --tw-ring-color: var(--golden); }
+
+  /* Golden/orange/beige hover states */
   .hover\:text-gold:hover { color: var(--gold); }
+  .hover\:text-golden:hover { color: var(--golden); }
+  .hover\:text-orange:hover { color: var(--orange); }
   .hover\:border-gold\/50:hover { border-color: rgba(0, 174, 116,0.5); }
+  .hover\:border-golden\/50:hover { border-color: rgba(212, 160, 23, 0.5); }
+  .hover\:border-orange\/50:hover { border-color: rgba(249, 115, 22, 0.5); }
   .hover\:bg-gold\/5:hover { background-color: rgba(0, 174, 116,0.05); }
+  .hover\:bg-golden\/5:hover { background-color: rgba(212, 160, 23, 0.05); }
+  .hover\:bg-orange\/5:hover { background-color: rgba(249, 115, 22, 0.05); }
+  .hover\:bg-beige:hover { background-color: var(--beige); }
+  .hover\:bg-gray-lighter:hover { background-color: var(--gray-lighter); }
+
+  /* Opacity backgrounds */
   .bg-gold\/15 { background-color: rgba(0, 174, 116,0.15); }
   .bg-gold\/10 { background-color: rgba(0, 174, 116,0.10); }
   .bg-gold\/20 { background-color: rgba(0, 174, 116,0.20); }
+  .bg-golden\/10 { background-color: rgba(212, 160, 23, 0.10); }
+  .bg-golden\/15 { background-color: rgba(212, 160, 23, 0.15); }
+  .bg-golden\/20 { background-color: rgba(212, 160, 23, 0.20); }
+  .bg-orange\/10 { background-color: rgba(249, 115, 22, 0.10); }
+  .bg-orange\/15 { background-color: rgba(249, 115, 22, 0.15); }
+  .bg-blue-deep\/10 { background-color: rgba(30, 58, 138, 0.10); }
+  .bg-blue-deep\/20 { background-color: rgba(30, 58, 138, 0.20); }
+  .bg-blue-dark\/10 { background-color: rgba(29, 78, 216, 0.10); }
+  .bg-blue-primary\/10 { background-color: rgba(37, 99, 235, 0.10); }
+  .bg-blue-primary\/15 { background-color: rgba(37, 99, 235, 0.15); }
 
-  .text-balance { text-wrap: balance; }
-  .rtl { direction: rtl; }
-
-  /* ── Futuristic background ── */
+  /* Gradient backgrounds */
+  .golden-gradient {
+    background: linear-gradient(135deg, var(--golden-deep) 0%, var(--golden) 50%, var(--golden-bright) 100%);
+  }
+  .orange-gradient {
+    background: linear-gradient(135deg, var(--orange-deep) 0%, var(--orange) 50%, var(--orange-bright) 100%);
+  }
+  .blue-gradient {
+    background: linear-gradient(135deg, var(--blue-deep) 0%, var(--blue-dark) 50%, var(--blue-primary) 100%);
+  }
+  .blue-gradient-light {
+    background: linear-gradient(135deg, var(--blue-bright) 0%, var(--blue-sky) 50%, var(--blue-light) 100%);
+  }
+  .golden-blue-gradient {
+    background: linear-gradient(135deg, var(--golden) 0%, var(--blue-dark) 50%, var(--blue-deep) 100%);
+  }
+  .beige-warm-gradient {
+    background: linear-gradient(135deg, var(--beige-white) 0%, var(--beige-light) 50%, var(--beige) 100%);
+  }
   .bg-futuristic {
     background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(63, 186, 235,0.12) 0%, transparent 60%),
                 radial-gradient(ellipse 60% 40% at 80% 80%, rgba(37, 99, 235,0.08) 0%, transparent 50%),
                 radial-gradient(ellipse 40% 30% at 20% 60%, rgba(0, 174, 116,0.06) 0%, transparent 50%),
                 hsl(230, 60%, 99%);
   }
+
+  .text-balance { text-wrap: balance; }
+  .rtl { direction: rtl; }
 
   /* ── Animations ── */
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }

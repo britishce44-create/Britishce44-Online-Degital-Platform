@@ -18,6 +18,8 @@ const USERS: Record<
     password: string;
   }
 > = {
+  "britishce44@gmail.com": { id: "1", email: "britishce44@gmail.com", firstName: "Admin", lastName: "Britishce44", role: "admin", password: "admin123" },
+  "supervisor@britishce44.edu": { id: "2", email: "supervisor@britishce44.edu", firstName: "Supervisor", lastName: "B44", role: "supervisor", password: "supervisor123" },
   "jamal.alshameeri": { id: "4", email: "jamal.alshameeri", firstName: "Jamal", lastName: "Al-Shameeri", role: "teacher", password: "teacher123" },
   "amani.alsharabi": { id: "5", email: "amani.alsharabi", firstName: "Amani", lastName: "Al-Sharabi", role: "teacher", password: "teacher123" },
   "khadeejah.alghaily": { id: "6", email: "khadeejah.alghaily", firstName: "Khadeejah", lastName: "Al-Ghaily", role: "teacher", password: "teacher123" },
@@ -45,27 +47,51 @@ router.post("/v1/auth/login", async (req, res) => {
     .limit(1);
 
   if (dbUser) {
-    if (dbUser.password !== password)
-      return res.status(401).json({ message: "Invalid credentials" });
-    const { firstName, lastName } = splitName(dbUser.name);
-    const accessToken = await createSession({
-      email: dbUser.email,
-      name: dbUser.name,
-      role: dbUser.role,
-      teacherId: dbUser.teacherId,
-      parentId: dbUser.parentId,
-      studentId: dbUser.studentId,
-    });
-    return res.json({
-      accessToken,
-      user: {
-        id: String(dbUser.id),
+    if (dbUser.password === password) {
+      // Check account status
+      if (dbUser.status === "suspended")
+        return res.status(403).json({ message: "Your account has been suspended. Contact administration." });
+      if (dbUser.status === "inactive")
+        return res.status(403).json({ message: "Your account is inactive. Contact administration." });
+
+      // Check access time limits
+      const now = new Date();
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+      const fromParts = (dbUser.accessFrom ?? "00:00").split(":").map(Number);
+      const toParts = (dbUser.accessTo ?? "23:59").split(":").map(Number);
+      const fromMin = fromParts[0] * 60 + (fromParts[1] || 0);
+      const toMin = toParts[0] * 60 + (toParts[1] || 0);
+      if (currentMinutes < fromMin || currentMinutes > toMin) {
+        return res.status(403).json({ message: `Access is restricted to ${dbUser.accessFrom} — ${dbUser.accessTo}. Please try again during your allowed hours.` });
+      }
+
+      const { firstName, lastName } = splitName(dbUser.name);
+      const accessToken = await createSession({
         email: dbUser.email,
-        firstName,
-        lastName,
+        name: dbUser.name,
         role: dbUser.role,
-      },
-    });
+        teacherId: dbUser.teacherId,
+        parentId: dbUser.parentId,
+        studentId: dbUser.studentId,
+      });
+
+      // Update last seen
+      await db.update(appUsers).set({ lastSeen: now.toLocaleString() }).where(eq(appUsers.id, dbUser.id));
+
+      return res.json({
+        accessToken,
+        user: {
+          id: String(dbUser.id),
+          email: dbUser.email,
+          firstName,
+          lastName,
+          role: dbUser.role,
+        },
+        permissions: dbUser.permissions,
+        dashboardConfig: dbUser.dashboardConfig,
+      });
+    }
+    // DB password didn't match — fall through to in-memory fallback below
   }
 
   // 2. In-memory fallback (extra demo logins + freshly registered users).

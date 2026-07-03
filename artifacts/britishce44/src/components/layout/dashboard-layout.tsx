@@ -7,6 +7,7 @@ import { MaintenanceProvider } from '@/components/maintenance/maintenance-provid
 import { DesignStudioKit } from '@/components/maintenance/design-studio-kit'
 import { DashboardPage } from '@/pages/dashboard'
 import { ClassroomsPage } from '@/pages/classrooms'
+import { isElectron, useElectronMeeting } from '@/lib/electron-bridge'
 import { MessengerPage } from '@/pages/messenger'
 import { ExamSystemPage } from '@/pages/exam-system'
 import { HomeworkPage } from '@/pages/homework'
@@ -29,9 +30,11 @@ import { AssessmentPage } from '@/pages/assessment'
 import { CalendarPage } from '@/pages/calendar'
 import { TasksPage } from '@/pages/tasks'
 import { NotificationsPage } from '@/pages/notifications'
+import { StudentMailboxPage } from '@/pages/student-mailbox'
 import { GlobalSearchPage } from '@/pages/global-search'
 import { AiLearningPage } from '@/pages/ai-learning'
 import { CommandCenterPage } from '@/pages/command-center'
+import { DigitalLibraryPage } from '@/pages/digital-library'
 import { DownloadCenterPage } from '@/pages/download-center'
 import { ParentPortalPage } from '@/pages/parent-portal'
 import { CompliancePage } from '@/pages/compliance'
@@ -46,11 +49,14 @@ export type PageKey =
   | 'videoarchive' | 'examroom' | 'aidev' | 'settings' | 'academicroom'
   | 'notifications' | 'globalsearch' | 'ailearning' | 'commandcenter'
   | 'downloadcenter' | 'parentportal' | 'compliance' | 'statuspage'
-  | 'assessment' | 'calendar' | 'tasks' | 'googleforms'
+  | 'assessment' | 'calendar' | 'tasks' | 'googleforms' | 'studentmailbox' | 'digitallibrary'
 
 function DashboardInner({ initialRoom }: { initialRoom?: number | null }) {
   const { user, logout } = useAuth()
-  const [currentPage, setCurrentPage] = useState<PageKey>(initialRoom ? 'classrooms' : 'dashboard')
+  const [currentPage, setCurrentPage] = useState<PageKey>(
+    initialRoom ? 'classrooms' :
+    user?.role === 'newcomer' ? 'academicroom' : 'dashboard'
+  )
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [classroomOpen, setClassroomOpen] = useState<number | null>(initialRoom ?? null)
 
@@ -60,7 +66,15 @@ function DashboardInner({ initialRoom }: { initialRoom?: number | null }) {
     }
     switch (currentPage) {
       case 'dashboard': return <DashboardPage />
-      case 'classrooms': return <ClassroomsPage onEnterClassroom={(id) => setClassroomOpen(id)} />
+      case 'classrooms': return <ClassroomsPage onEnterClassroom={(id) => {
+        if (isElectron) {
+          const stored = localStorage.getItem('b44_user')
+          const user = stored ? JSON.parse(stored) : null
+          window.b44Desktop?.openMeetingWindow(id, String(user?.id || ''), user?.firstName + ' ' + user?.lastName || 'User')
+        } else {
+          setClassroomOpen(id)
+        }
+      }} />
       case 'users': return <UsersPage />
       case 'ce4messenger': return <MessengerPage />
       case 'examsystem': return <ExamSystemPage />
@@ -80,6 +94,8 @@ function DashboardInner({ initialRoom }: { initialRoom?: number | null }) {
       case 'academicroom': return <AcademicRoomPage />
       case 'googleforms': return <GoogleFormsPage />
       case 'assessment': return <AssessmentPage />
+      case 'studentmailbox': return <StudentMailboxPage />
+      case 'digitallibrary': return <DigitalLibraryPage />
       case 'calendar': return <CalendarPage />
       case 'tasks': return <TasksPage />
       case 'notifications': return <NotificationsPage />

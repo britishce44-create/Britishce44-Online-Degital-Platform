@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+  <title>British Center for Education — Online Digital Platform</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: #080f22;
+      color: #fff;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+      position: relative;
+      background: radial-gradient(ellipse at center, rgba(30,58,138,0.3) 0%, transparent 70%);
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(212,160,23,0.03) 1px, transparent 1px);
+      background-size: 30px 30px;
+      pointer-events: none;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(212,160,23,0.1);
+      border: 1px solid rgba(212,160,23,0.2);
+      padding: 8px 20px;
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #D4A017;
+      margin-bottom: 2rem;
+    }
+    .logo {
+      width: 80px;
+      height: 80px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #D4A017, #F5C518);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.5rem;
+      box-shadow: 0 8px 32px rgba(212,160,23,0.25);
+    }
+    .logo span {
+      font-size: 32px;
+      font-weight: 900;
+      color: #0a1a4a;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 900;
+      line-height: 1.1;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #fff 0%, #93b4f5 50%, #D4A017 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      font-size: 1.05rem;
+      color: rgba(255,255,255,0.5);
+      max-width: 560px;
+      line-height: 1.6;
+      margin-bottom: 2.5rem;
+    }
+    .cta-group {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 32px;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      background: linear-gradient(135deg, #D4A017, #F5C518);
+      color: #0a1a4a;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(212,160,23,0.35);
+    }
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 32px;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      border: 1px solid rgba(255,255,255,0.1);
+      cursor: pointer;
+      text-decoration: none;
+      background: rgba(255,255,255,0.05);
+      color: #fff;
+      transition: background 0.2s;
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      max-width: 800px;
+      width: 100%;
+      margin-top: 3rem;
+    }
+    .feature-card {
+      padding: 20px 16px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.05);
+      text-align: center;
+    }
+    .feature-card .icon { font-size: 28px; margin-bottom: 8px; }
+    .feature-card .title { font-size: 13px; font-weight: 700; }
+    .feature-card .desc { font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 4px; }
+    footer {
+      padding: 2rem;
+      text-align: center;
+      font-size: 11px;
+      color: rgba(255,255,255,0.2);
+      border-top: 1px solid rgba(255,255,255,0.04);
+    }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <div class="badge">🎓 Britishce44 — Online Digital School</div>
+    <div class="logo"><span>B44</span></div>
+    <h1>Welcome to the<br/>British Center for Education</h1>
+    <p>Taiz, Yemen — Online learning platform with live classrooms, AI-powered assessment, quizzes, digital library, and student management.</p>
+    <div class="cta-group">
+      <a href="/login" class="btn-primary">
+        🚀 Enter Platform
+      </a>
+      <a href="/app-download" class="btn-secondary">
+        📱 Mobile App
+      </a>
+      <a href="#" onclick="document.getElementById('newcomer-form').scrollIntoView({behavior:'smooth'})" class="btn-secondary">
+        👤 New Student
+      </a>
+    </div>
+    <div class="features">
+      <div class="feature-card">
+        <div class="icon">🏫</div>
+        <div class="title">Live Classrooms</div>
+        <div class="desc">Video, whiteboard, chat & collaboration</div>
+      </div>
+      <div class="feature-card">
+        <div class="icon">📝</div>
+        <div class="title">Smart Quizzes</div>
+        <div class="desc">Anti-cheat, auto-graded, AI monitoring</div>
+      </div>
+      <div class="feature-card">
+        <div class="icon">📊</div>
+        <div class="title">Reports & Analytics</div>
+        <div class="desc">PDF reports, performance tracking</div>
+      </div>
+      <div class="feature-card">
+        <div class="icon">📚</div>
+        <div class="title">Digital Library</div>
+        <div class="desc">10 rooms, videos, books, games & more</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    British Center for Education — Britishce44 &copy; 2026 &middot; Taiz, Yemen &middot; +967783226233
+  </footer>
+
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

@@ -1,7 +1,9 @@
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '@/components/providers/auth-provider'
+import { StudentQuizView } from '@/components/quizzes/student-quiz'
+import { TeacherMonitor } from '@/components/quizzes/teacher-monitor'
 
 /* ─────────────────────────────────────────────────── */
 /*  Course data                                         */
@@ -206,10 +208,10 @@ const COURSES: Course[] = [
   },
 ]
 
-const CAT_CONFIG = {
+  const CAT_CONFIG = {
   phonics: { label: 'Pre-Diploma Phonics', emoji: '🔤', color: '#dc2626', bg: 'rgba(220,38,38,0.06)', border: 'rgba(220,38,38,0.15)' },
   kids:    { label: 'Kids English',        emoji: '🐸', color: '#00ae74', bg: 'rgba(22,163,74,0.06)',  border: 'rgba(22,163,74,0.15)' },
-  teens:   { label: 'Teens & Adults',      emoji: '🎓', color: '#3b82f6', bg: 'rgba(63, 186, 235,0.06)', border: 'rgba(63, 186, 235,0.15)' },
+  teens:   { label: 'Teens & Adults',      emoji: '🎓', color: '#3b82f6', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.18)' },
 }
 
 /* ─────────────────────────────────────────────────── */
@@ -296,14 +298,14 @@ function CourseCard({ course }: { course: Course }) {
               style={{ background: `${c.from}14`, color: c.from }}>
               {i + 1}
             </div>
-            <p className="text-[10px] text-gray-600 leading-snug">{goal}</p>
+              <p className="text-[10px] text-gray-700 leading-snug font-medium">{goal}</p>
           </div>
         ))}
       </div>
 
       {/* ── Footer ── */}
       <div className="px-4 pb-3.5 flex items-center justify-between">
-        <span className="text-[9px] text-gray-400 flex items-center gap-1">
+        <span className="text-[9px] text-gray-500 flex items-center gap-1 font-medium">
           <span>👥</span> {course.students} students enrolled
         </span>
         <button className="text-[9px] font-bold px-3 py-1.5 rounded-full transition"
@@ -335,10 +337,10 @@ function CoursesSection() {
       {/* Section header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h3 className="text-lg font-black text-gray-900 flex items-center gap-2">
+          <h3 className="text-lg font-black text-blue-deep flex items-center gap-2">
             📚 Our Courses
           </h3>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <p className="text-xs text-gray-500 mt-0.5">
             {COURSES.length} books across 3 programmes · {COURSES.reduce((a, c) => a + (c.students || 0), 0)} students enrolled
           </p>
         </div>
@@ -353,10 +355,10 @@ function CoursesSection() {
             <button key={f.id} onClick={() => setActiveCategory(f.id)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition"
               style={activeCategory === f.id ? {
-                background: 'linear-gradient(135deg,#3b82f6,#2563eb)',
-                color: '#fff', boxShadow: '0 2px 10px rgba(63, 186, 235,0.3)',
+                background: 'linear-gradient(135deg,#2563eb,#1d4ed8)',
+                color: '#fff', boxShadow: '0 2px 10px rgba(37,99,235,0.3)',
               } : {
-                background: '#f3f4f6', color: '#6b7280',
+                background: 'var(--beige-light)', color: 'var(--blue-dark)',
               }}>
               <span>{f.emoji}</span>{f.label}
             </button>
@@ -380,7 +382,7 @@ function CoursesSection() {
               </div>
               <div>
                 <h4 className="text-sm font-black" style={{ color: cfg.color }}>{cfg.label}</h4>
-                <p className="text-[10px] text-gray-400">{books.length} {books.length === 1 ? 'book' : 'books'}</p>
+                <p className="text-[10px] text-gray-500">{books.length} {books.length === 1 ? 'book' : 'books'}</p>
               </div>
               <div className="ml-auto h-px flex-1 max-w-xs" style={{ background: `linear-gradient(to right, ${cfg.border}, transparent)` }} />
             </div>
@@ -417,8 +419,8 @@ const STAT_COLORS = [
 function StatCard({ label, value, icon, idx, sub }: { label: string; value: string; icon: string; idx: number; sub?: string }) {
   const c = STAT_COLORS[idx % STAT_COLORS.length]
   return (
-    <div className="rounded-2xl p-5 relative overflow-hidden transition-all duration-200 hover:-translate-y-1 cursor-default"
-      style={{ background: 'white', border: '1px solid rgba(230,235,255,0.9)', boxShadow: '0 2px 12px rgba(8,15,34,0.06)' }}
+    <div className="rounded-2xl p-5 relative overflow-hidden transition-all duration-200 hover:-translate-y-1 cursor-default bg-beige-white"
+      style={{ border: '1px solid rgba(30,58,138,0.08)', boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}
       onMouseEnter={e => {
         const el = e.currentTarget as HTMLElement
         el.style.boxShadow = `0 8px 28px ${c.glow}`
@@ -426,8 +428,8 @@ function StatCard({ label, value, icon, idx, sub }: { label: string; value: stri
       }}
       onMouseLeave={e => {
         const el = e.currentTarget as HTMLElement
-        el.style.boxShadow = '0 2px 12px rgba(8,15,34,0.06)'
-        el.style.borderColor = 'rgba(230,235,255,0.9)'
+        el.style.boxShadow = '0 2px 12px rgba(30,58,138,0.05)'
+        el.style.borderColor = 'rgba(30,58,138,0.08)'
       }}>
       <div className="absolute top-0 right-0 w-16 h-16 rounded-bl-full opacity-10"
         style={{ background: `linear-gradient(135deg, ${c.from}, ${c.to})` }} />
@@ -443,18 +445,18 @@ function StatCard({ label, value, icon, idx, sub }: { label: string; value: stri
         style={{ background: `linear-gradient(135deg, ${c.from}, ${c.to})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
         {value}
       </p>
-      <p className="text-xs font-semibold text-gray-600">{label}</p>
-      {sub && <p className="text-[9px] text-gray-400 mt-0.5">{sub}</p>}
+      <p className="text-xs font-bold text-blue-deep">{label}</p>
+      {sub && <p className="text-[9px] text-gray-500 mt-0.5 font-medium">{sub}</p>}
     </div>
   )
 }
 
 function QuickActionBtn({ label, color }: { label: string; color: string }) {
   return (
-    <button className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all hover:-translate-y-0.5"
-      style={{ background: `${color}10`, border: `1px solid ${color}25`, color, boxShadow: `0 2px 8px ${color}10` }}
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${color}20` }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = `${color}10` }}>
+    <button className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold transition-all hover:-translate-y-0.5"
+      style={{ background: `${color}12`, border: `1px solid ${color}30`, color, boxShadow: `0 2px 8px ${color}15` }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `${color}22` }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = `${color}12` }}>
       {label}
     </button>
   )
@@ -464,8 +466,8 @@ function SectionHeader({ title, sub }: { title: string; sub?: string }) {
   return (
     <div className="flex items-end justify-between mb-4">
       <div>
-        <h3 className="text-sm font-bold text-gray-800">{title}</h3>
-        {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
+        <h3 className="text-sm font-bold text-blue-deep">{title}</h3>
+        {sub && <p className="text-[10px] text-blue-deep/60 mt-0.5 font-medium">{sub}</p>}
       </div>
     </div>
   )
@@ -610,9 +612,9 @@ function CenterInfoSection() {
             whileHover={{ y: -3 }}
             className="rounded-2xl overflow-hidden cursor-default"
             style={{
-              background: 'white',
+              background: 'var(--beige-white)',
               border: `1px solid ${card.color.border}`,
-              boxShadow: `0 4px 24px rgba(0,0,0,0.06), 0 0 0 1px ${card.color.border}`,
+              boxShadow: `0 4px 24px rgba(30,58,138,0.05), 0 0 0 1px ${card.color.border}`,
               transition: 'box-shadow 0.2s',
             }}
             onMouseEnter={e => (e.currentTarget as HTMLElement).style.boxShadow = `0 12px 36px ${card.color.glow}, 0 0 0 1px ${card.color.border}`}
@@ -681,108 +683,127 @@ function CenterInfoSection() {
 /*  Dashboard page                                      */
 /* ─────────────────────────────────────────────────── */
 
+const DEFAULT_DASHBOARD_CONFIG = {
+  overview: true, courses: true, schedule: true, tasks: true,
+  notifications: true, recentActivity: true, performance: true,
+  attendance: true, messages: true, announcements: true,
+}
+
+function Widget({ show, children }: { show: boolean; children: React.ReactNode }) {
+  if (!show) return null
+  return <>{children}</>
+}
+
 export function DashboardPage() {
   const { user } = useAuth()
+  const cfg = user?.dashboardConfig ?? DEFAULT_DASHBOARD_CONFIG
 
   if (user?.role === 'admin' || user?.role === 'supervisor') {
     return (
       <div className="space-y-6 animate-fade-in">
-        {/* Hero */}
-        <div className="rounded-2xl p-6 relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #1d1668 0%, #131f40 50%, #1a2550 100%)', border: '1px solid rgba(63, 186, 235,0.20)', boxShadow: '0 8px 32px rgba(8,15,34,0.25)' }}>
-          <div className="absolute inset-0 opacity-[0.03]"
-            style={{ backgroundImage: 'linear-gradient(rgba(63, 186, 235,1) 1px, transparent 1px), linear-gradient(90deg, rgba(63, 186, 235,1) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
-          <div className="absolute top-0 right-0 w-64 h-full opacity-10 pointer-events-none"
-            style={{ background: 'radial-gradient(ellipse at right, #3b82f6, transparent)' }} />
-          <div className="relative">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg"
-                style={{ background: 'linear-gradient(135deg, #00875a, #00ae74)', color: '#17125c', boxShadow: '0 4px 16px rgba(0, 174, 116,0.30)' }}>B</div>
-              <div>
-                <p className="text-xs text-indigo-300/50 uppercase tracking-widest">Admin Control Panel</p>
-                <h2 className="text-xl font-bold text-white leading-tight">Welcome back, {user.firstName}</h2>
+        <Widget show={cfg.overview}>
+          {/* Hero */}
+          <div className="rounded-2xl p-6 relative overflow-hidden blue-gradient"
+            style={{ border: '1px solid rgba(212,160,23,0.25)', boxShadow: '0 8px 32px rgba(30,58,138,0.30)' }}>
+            <div className="absolute inset-0 opacity-[0.04]"
+              style={{ backgroundImage: 'linear-gradient(rgba(255,215,0,0.6) 1px, transparent 1px), linear-gradient(90deg, rgba(255,215,0,0.6) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+            <div className="absolute top-0 right-0 w-64 h-full opacity-15 pointer-events-none"
+              style={{ background: 'radial-gradient(ellipse at right, #D4A017, transparent)' }} />
+            <div className="relative">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg golden-gradient"
+                  style={{ color: '#fff', boxShadow: '0 4px 16px rgba(212,160,23,0.40)' }}>B</div>
+                <div>
+                  <p className="text-xs text-golden-bright/70 uppercase tracking-widest font-semibold">Admin Control Panel</p>
+                  <h2 className="text-xl font-bold text-white leading-tight drop-shadow-sm">Welcome back, {user.firstName}</h2>
+                </div>
+              </div>
+              <p className="text-sm text-gray-300 font-medium">Britishce44 Online Digital School · Taiz, Yemen · All systems operational</p>
+              <div className="flex items-center gap-3 mt-3">
+                <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />Platform Online</span>
+                <span className="flex items-center gap-1.5 text-[10px] text-blue-300 font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-blue-300" />240 Classrooms Ready</span>
+                <span className="flex items-center gap-1.5 text-[10px] text-golden-bright font-semibold"><span className="w-1.5 h-1.5 rounded-full bg-golden-bright" />AI Systems Active</span>
               </div>
             </div>
-            <p className="text-sm text-gray-400">Britishce44 Online Digital School · Taiz, Yemen · All systems operational</p>
-            <div className="flex items-center gap-3 mt-3">
-              <span className="flex items-center gap-1.5 text-[10px] text-emerald-400"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />Platform Online</span>
-              <span className="flex items-center gap-1.5 text-[10px] text-indigo-400"><span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />240 Classrooms Ready</span>
-              <span className="flex items-center gap-1.5 text-[10px] text-amber-400"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />AI Systems Active</span>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard label="Total Users" value="60+" icon="👥" idx={0} sub="Active accounts" />
+            <StatCard label="Students" value="50" icon="🎓" idx={1} sub="Enrolled" />
+            <StatCard label="Teachers" value="9" icon="👩‍🏫" idx={2} sub="Active faculty" />
+            <StatCard label="Classrooms" value="240" icon="🚪" idx={3} sub="WebRTC enabled" />
+          </div>
+
+          {/* Quick actions + overview */}
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="rounded-2xl p-5 bg-beige-white border border-blue-pale/60" style={{ boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}>
+              <SectionHeader title="⚡ Quick Actions" sub="Most-used admin tools" />
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: '👥 Manage Users', color: '#3b82f6' }, { label: '🚪 Classrooms', color: '#2563eb' },
+                  { label: '💬 CE4 Messenger', color: '#00ae74' }, { label: '📝 Exam System', color: '#00ae74' },
+                  { label: '⭐ Teacher Eval', color: '#0891b2' }, { label: '📄 Assessment Reports', color: '#7c3aed' },
+                  { label: '⚙️ Settings', color: '#6b7280' },
+                ].map(b => <QuickActionBtn key={b.label} label={b.label} color={b.color} />)}
+              </div>
+            </div>
+            <div className="rounded-2xl p-5 bg-beige-white border border-blue-pale/60" style={{ boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}>
+              <SectionHeader title="📋 Platform Overview" sub="Real-time platform status" />
+              <div className="space-y-2.5">
+                {[
+                  { icon: '🎓', label: 'Students', value: '50 enrolled', color: '#0891b2' },
+                  { icon: '👩‍🏫', label: 'Teachers', value: '9 active', color: '#3b82f6' },
+                  { icon: '🚪', label: 'Classrooms', value: '240 rooms · WebRTC', color: '#2563eb' },
+                  { icon: '📝', label: 'Exams', value: '100 tests · AI proctored', color: '#00ae74' },
+                  { icon: '🛡️', label: 'Anti-Cheat', value: 'Active · Real-time', color: '#e11d48' },
+                  { icon: '📊', label: 'Reports', value: 'Triple reports enabled', color: '#00ae74' },
+                ].map(item => (
+                  <div key={item.label} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-beige transition bg-beige-white/50">
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm shrink-0"
+                      style={{ background: `${item.color}15`, border: `1px solid ${item.color}25` }}>{item.icon}</div>
+                    <span className="text-xs font-bold text-blue-deep flex-1">{item.label}</span>
+                    <span className="text-[10px] font-bold" style={{ color: item.color }}>{item.value}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
+        </Widget>
+
+        {/* ── CENTER INFO (always on) ── */}
+        <div className="rounded-2xl p-5 bg-beige-white border border-blue-pale/60" style={{ boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}>
+          <CenterInfoSection />
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard label="Total Users" value="60+" icon="👥" idx={0} sub="Active accounts" />
-          <StatCard label="Students" value="50" icon="🎓" idx={1} sub="Enrolled" />
-          <StatCard label="Teachers" value="9" icon="👩‍🏫" idx={2} sub="Active faculty" />
-          <StatCard label="Classrooms" value="240" icon="🚪" idx={3} sub="WebRTC enabled" />
-        </div>
-
-        {/* Quick actions + overview */}
-        <div className="grid md:grid-cols-2 gap-4">
-          <div className="rounded-2xl p-5 bg-white border border-gray-100/80" style={{ boxShadow: '0 2px 12px rgba(8,15,34,0.05)' }}>
-            <SectionHeader title="⚡ Quick Actions" sub="Most-used admin tools" />
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: '👥 Manage Users', color: '#3b82f6' }, { label: '🚪 Classrooms', color: '#2563eb' },
-                { label: '💬 CE4 Messenger', color: '#00ae74' }, { label: '📝 Exam System', color: '#00ae74' },
-                { label: '⭐ Teacher Eval', color: '#0891b2' }, { label: '⚙️ Settings', color: '#6b7280' },
-              ].map(b => <QuickActionBtn key={b.label} label={b.label} color={b.color} />)}
-            </div>
+        <Widget show={cfg.courses}>
+          {/* ── COURSES SECTION ── */}
+          <div className="rounded-2xl p-5 bg-beige-white border border-blue-pale/60" style={{ boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}>
+            <CoursesSection />
           </div>
-          <div className="rounded-2xl p-5 bg-white border border-gray-100/80" style={{ boxShadow: '0 2px 12px rgba(8,15,34,0.05)' }}>
-            <SectionHeader title="📋 Platform Overview" sub="Real-time platform status" />
-            <div className="space-y-2.5">
+        </Widget>
+
+        <Widget show={cfg.recentActivity}>
+          {/* Recent activity */}
+          <div className="rounded-2xl p-5 bg-beige-white border border-blue-pale/60" style={{ boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}>
+            <SectionHeader title="🔔 Recent Activity" sub="Latest platform events" />
+            <div className="space-y-2">
               {[
-                { icon: '🎓', label: 'Students', value: '50 enrolled', color: '#0891b2' },
-                { icon: '👩‍🏫', label: 'Teachers', value: '9 active', color: '#3b82f6' },
-                { icon: '🚪', label: 'Classrooms', value: '240 rooms · WebRTC', color: '#2563eb' },
-                { icon: '📝', label: 'Exams', value: '100 tests · AI proctored', color: '#00ae74' },
-                { icon: '🛡️', label: 'Anti-Cheat', value: 'Active · Real-time', color: '#e11d48' },
-                { icon: '📊', label: 'Reports', value: 'Triple reports enabled', color: '#00ae74' },
-              ].map(item => (
-                <div key={item.label} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 transition">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-sm shrink-0"
-                    style={{ background: `${item.color}12`, border: `1px solid ${item.color}20` }}>{item.icon}</div>
-                  <span className="text-xs font-semibold text-gray-700 flex-1">{item.label}</span>
-                  <span className="text-[10px] font-medium" style={{ color: item.color }}>{item.value}</span>
+                { icon: '✅', text: 'Class A1 — English session completed', time: '2 min ago', color: '#00ae74' },
+                { icon: '📝', text: 'Exam #47 submitted by 12 students', time: '8 min ago', color: '#2563eb' },
+                { icon: '👤', text: 'New student registered: Sara Ahmed', time: '15 min ago', color: '#0891b2' },
+                { icon: '⭐', text: 'Teacher evaluation report generated', time: '1 hr ago', color: '#D4A017' },
+                { icon: '📢', text: 'Marketing newsletter sent · 340 recipients', time: '2 hr ago', color: '#2563eb' },
+              ].map((a, i) => (
+                <div key={i} className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-beige transition bg-beige-white/50">
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 mt-0.5" style={{ background: `${a.color}15` }}>{a.icon}</div>
+                  <p className="text-xs font-semibold text-blue-deep flex-1">{a.text}</p>
+                  <span className="text-[9px] text-gray-500 font-medium shrink-0">{a.time}</span>
                 </div>
               ))}
             </div>
           </div>
-        </div>
-
-        {/* ── CENTER INFO ── */}
-        <div className="rounded-2xl p-5 bg-white border border-gray-100/80" style={{ boxShadow: '0 2px 12px rgba(8,15,34,0.05)' }}>
-          <CenterInfoSection />
-        </div>
-
-        {/* ── COURSES SECTION ── */}
-        <div className="rounded-2xl p-5 bg-white border border-gray-100/80" style={{ boxShadow: '0 2px 12px rgba(8,15,34,0.05)' }}>
-          <CoursesSection />
-        </div>
-
-        {/* Recent activity */}
-        <div className="rounded-2xl p-5 bg-white border border-gray-100/80" style={{ boxShadow: '0 2px 12px rgba(8,15,34,0.05)' }}>
-          <SectionHeader title="🔔 Recent Activity" sub="Latest platform events" />
-          <div className="space-y-2">
-            {[
-              { icon: '✅', text: 'Class A1 — English session completed', time: '2 min ago', color: '#00ae74' },
-              { icon: '📝', text: 'Exam #47 submitted by 12 students', time: '8 min ago', color: '#3b82f6' },
-              { icon: '👤', text: 'New student registered: Sara Ahmed', time: '15 min ago', color: '#0891b2' },
-              { icon: '⭐', text: 'Teacher evaluation report generated', time: '1 hr ago', color: '#00ae74' },
-              { icon: '📢', text: 'Marketing newsletter sent · 340 recipients', time: '2 hr ago', color: '#2563eb' },
-            ].map((a, i) => (
-              <div key={i} className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-gray-50 transition">
-                <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 mt-0.5" style={{ background: `${a.color}12` }}>{a.icon}</div>
-                <p className="text-xs text-gray-700 flex-1">{a.text}</p>
-                <span className="text-[9px] text-gray-400 shrink-0">{a.time}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        </Widget>
       </div>
     )
   }
@@ -790,64 +811,137 @@ export function DashboardPage() {
   if (user?.role === 'teacher') {
     return (
       <div className="space-y-6 animate-fade-in">
-        <div className="rounded-2xl p-6 relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #1d1668, #1a2550)', border: '1px solid rgba(63, 186, 235,0.20)', boxShadow: '0 8px 32px rgba(8,15,34,0.25)' }}>
-          <h2 className="text-xl font-bold text-white">👩‍🏫 Teacher Dashboard</h2>
-          <p className="text-sm text-indigo-300/60 mt-1">Welcome back, {user.firstName} · Ready to teach</p>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard label="My Classes" value="8" icon="🚪" idx={0} />
-          <StatCard label="Students" value="24" icon="🎓" idx={1} />
-          <StatCard label="Homework" value="6" icon="📄" idx={2} sub="Pending review" />
-          <StatCard label="Exams" value="3" icon="📝" idx={3} sub="This week" />
-        </div>
-        <div className="rounded-2xl p-5 bg-white border border-gray-100/80" style={{ boxShadow: '0 2px 12px rgba(8,15,34,0.05)' }}>
-          <SectionHeader title="🎯 Today's Schedule" />
-          <div className="space-y-2">
-            {['09:00 — English Grammar · Class A1', '11:00 — Reading & Writing · Class B2', '14:00 — Conversation Practice · Class C3'].map((s, i) => (
-              <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-indigo-50 border border-indigo-100">
-                <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
-                <span className="text-sm text-gray-700">{s}</span>
-              </div>
-            ))}
+        <Widget show={cfg.overview}>
+          <div className="rounded-2xl p-6 relative overflow-hidden blue-gradient"
+            style={{ border: '1px solid rgba(212,160,23,0.20)', boxShadow: '0 8px 32px rgba(30,58,138,0.30)' }}>
+            <h2 className="text-xl font-bold text-white drop-shadow-sm">👩‍🏫 Teacher Dashboard</h2>
+            <p className="text-sm text-golden-bright/70 mt-1 font-medium">Welcome back, {user.firstName} · Ready to teach</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard label="My Classes" value="8" icon="🚪" idx={0} />
+            <StatCard label="Students" value="24" icon="🎓" idx={1} />
+            <StatCard label="Homework" value="6" icon="📄" idx={2} sub="Pending review" />
+            <StatCard label="Exams" value="3" icon="📝" idx={3} sub="This week" />
+          </div>
+        </Widget>
+        <Widget show={cfg.schedule}>
+          <div className="rounded-2xl p-5 bg-beige-white border border-blue-pale/60" style={{ boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}>
+            <SectionHeader title="🎯 Today's Schedule" />
+            <div className="space-y-2">
+              {['09:00 — English Grammar · Class A1', '11:00 — Reading & Writing · Class B2', '14:00 — Conversation Practice · Class C3'].map((s, i) => (
+                <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-blue-ice border border-blue-pale">
+                  <span className="w-2 h-2 rounded-full bg-blue-primary shrink-0" />
+                  <span className="text-sm font-semibold text-blue-deep">{s}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Widget>
+        {/* My Assessment Reports */}
+        <div className="rounded-2xl p-5 bg-beige-white border border-blue-pale/60" style={{ boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <SectionHeader title="📄 Assessment Reports" sub="In-class performance reports with feedback" />
+            <span className="text-[10px] px-2 py-1 rounded-full bg-blue-ice text-blue-primary font-bold">Auto-generated</span>
+          </div>
+          <p className="text-sm text-gray-600 font-medium mb-3">Detailed reports with student weaknesses analysis, suggested activities, and modern teaching methods are available after each classroom assessment.</p>
+          <div className="flex gap-2">
+            <button className="px-4 py-2 rounded-xl text-sm font-bold text-white transition"
+              style={{ background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', boxShadow: '0 4px 14px rgba(37,99,235,0.35)' }}>
+              📊 View My Reports
+            </button>
+            <button className="px-4 py-2 rounded-xl text-sm font-bold text-blue-primary bg-blue-ice border border-blue-pale hover:bg-blue-pale transition">
+              📝 New Assessment
+            </button>
           </div>
         </div>
-        {/* Center info for teacher */}
-        <div className="rounded-2xl p-5 bg-white border border-gray-100/80" style={{ boxShadow: '0 2px 12px rgba(8,15,34,0.05)' }}>
+        {/* Quiz Monitor */}
+        {user?.role === 'teacher' && (
+          <div className="rounded-2xl overflow-hidden bg-beige-white" style={{ border: '1px solid rgba(30,58,138,0.08)', boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}>
+            <TeacherMonitor />
+          </div>
+        )}
+        {/* Center info (always on) */}
+        <div className="rounded-2xl p-5 bg-beige-white border border-blue-pale/60" style={{ boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}>
           <CenterInfoSection />
         </div>
-        {/* Courses for teacher */}
-        <div className="rounded-2xl p-5 bg-white border border-gray-100/80" style={{ boxShadow: '0 2px 12px rgba(8,15,34,0.05)' }}>
-          <CoursesSection />
-        </div>
+        <Widget show={cfg.courses}>
+          <div className="rounded-2xl p-5 bg-beige-white border border-blue-pale/60" style={{ boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}>
+            <CoursesSection />
+          </div>
+        </Widget>
       </div>
     )
   }
 
   /* Student / Parent */
+  const [quizOpen, setQuizOpen] = useState(false)
+
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="rounded-2xl p-6 relative overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, #1d1668, #241c80)', border: '1px solid rgba(63, 186, 235,0.20)', boxShadow: '0 8px 32px rgba(8,15,34,0.25)' }}>
-        <h2 className="text-xl font-bold text-white">
-          {user?.role === 'parent' ? '👨‍👩‍👧 Parent Dashboard' : '🎓 Student Dashboard'}
-        </h2>
-        <p className="text-sm text-indigo-300/60 mt-1">Welcome, {user?.firstName} · Britishce44 Digital School</p>
+    <>
+      <AnimatePresence>
+        {quizOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[999]" style={{ background: '#0b1120' }}>
+            <StudentQuizView />
+            <button onClick={() => setQuizOpen(false)}
+              className="fixed top-4 right-4 z-[1000] px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-red-500/20 hover:bg-red-500/40 transition border border-red-500/30">
+              ✕ Exit Quiz
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="space-y-6 animate-fade-in">
+        <Widget show={cfg.overview}>
+          <div className="rounded-2xl p-6 relative overflow-hidden blue-gradient"
+            style={{ border: '1px solid rgba(212,160,23,0.20)', boxShadow: '0 8px 32px rgba(30,58,138,0.30)' }}>
+            <h2 className="text-xl font-bold text-white drop-shadow-sm">
+              {user?.role === 'parent' ? '👨‍👩‍👧 Parent Dashboard' : '🎓 Student Dashboard'}
+            </h2>
+            <p className="text-sm text-golden-bright/70 mt-1 font-medium">Welcome, {user?.firstName} · Britishce44 Digital School</p>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatCard label="My Courses" value="5" icon="📚" idx={0} />
+            <StatCard label="Completed" value="12" icon="✅" idx={1} />
+            <StatCard label="Upcoming" value="3" icon="📅" idx={2} sub="This week" />
+            <StatCard label="Grade" value="A+" icon="⭐" idx={3} />
+          </div>
+        </Widget>
+        {/* My Quizzes section for student */}
+        {user?.role === 'student' && (
+          <div className="rounded-2xl p-5 bg-beige-white border border-blue-pale/60" style={{ boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}>
+            <div className="flex items-center justify-between mb-3">
+              <SectionHeader title="📝 My Quizzes" sub="Pending quizzes and tests" />
+              <button onClick={() => setQuizOpen(true)}
+                className="px-4 py-2 rounded-xl text-sm font-bold text-white transition"
+                style={{ background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', boxShadow: '0 4px 14px rgba(37,99,235,0.35)' }}>
+                📝 Open Quiz Center
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 font-medium">Scheduled quizzes (Quiz 1, Quiz 2, Speaking Quiz, Final Test) appear here on their scheduled date. Full-screen mode with camera, microphone, and AI anti-cheat monitoring enabled.</p>
+          </div>
+        )}
+        {/* Center info (always on) */}
+        <div className="rounded-2xl p-5 bg-beige-white border border-blue-pale/60" style={{ boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}>
+          <CenterInfoSection />
+        </div>
+        <Widget show={cfg.courses}>
+          <div className="rounded-2xl p-5 bg-beige-white border border-blue-pale/60" style={{ boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}>
+            <CoursesSection />
+          </div>
+        </Widget>
+        {/* My Reports section for student/parent */}
+        <div className="rounded-2xl p-5 bg-beige-white border border-blue-pale/60" style={{ boxShadow: '0 2px 12px rgba(30,58,138,0.05)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <SectionHeader title="📄 My Reports" sub={user?.role === 'parent' ? "Your child's performance reports" : 'Your performance reports'} />
+          </div>
+          <p className="text-sm text-gray-600 font-medium mb-3">Bilingual (Arabic/English) assessment reports with detailed performance analysis, strengths, and recommendations. Quiz results with mistake explanations and topics to review.</p>
+          <button className="px-4 py-2 rounded-xl text-sm font-bold text-white transition"
+            style={{ background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', boxShadow: '0 4px 14px rgba(37,99,235,0.35)' }}>
+            📊 View My Reports
+          </button>
+        </div>
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="My Courses" value="5" icon="📚" idx={0} />
-        <StatCard label="Completed" value="12" icon="✅" idx={1} />
-        <StatCard label="Upcoming" value="3" icon="📅" idx={2} sub="This week" />
-        <StatCard label="Grade" value="A+" icon="⭐" idx={3} />
-      </div>
-      {/* Center info for student/parent */}
-      <div className="rounded-2xl p-5 bg-white border border-gray-100/80" style={{ boxShadow: '0 2px 12px rgba(8,15,34,0.05)' }}>
-        <CenterInfoSection />
-      </div>
-      {/* Courses for student/parent */}
-      <div className="rounded-2xl p-5 bg-white border border-gray-100/80" style={{ boxShadow: '0 2px 12px rgba(8,15,34,0.05)' }}>
-        <CoursesSection />
-      </div>
-    </div>
+    </>
   )
 }

@@ -9,11 +9,21 @@ import {
 } from "react";
 import { io, Socket } from "socket.io-client";
 
-const ICE_SERVERS = [
-  { urls: "stun:stun.l.google.com:19302" },
-  { urls: "stun:stun1.l.google.com:19302" },
-  { urls: "stun:stun2.l.google.com:19302" },
-];
+function getIceServers(): RTCIceServer[] {
+  const servers: RTCIceServer[] = [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+  ];
+  try {
+    const envTurn = import.meta.env.VITE_TURN_SERVERS as string | undefined;
+    if (envTurn) {
+      const parsed = JSON.parse(envTurn) as RTCIceServer[];
+      if (Array.isArray(parsed)) servers.push(...parsed);
+    }
+  } catch {}
+  return servers;
+}
 
 export interface RemoteParticipant {
   id: string;
@@ -82,7 +92,7 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
 
   const createPC = useCallback(
     (peerId: string): RTCPeerConnection => {
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+      const pc = new RTCPeerConnection({ iceServers: getIceServers() });
       pcsRef.current.set(peerId, pc);
 
       localStreamRef.current
@@ -176,18 +186,41 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
       const stored = localStorage.getItem("b44_user");
       const role = stored ? (JSON.parse(stored).role ?? "student") : "student";
 
-      const socket = io(window.location.origin, {
+      const signalingUrl = (import.meta.env.VITE_SIGNALING_URL as string) || window.location.origin;
+      const socket = io(signalingUrl, {
         path: "/api/socket.io",
         transports: ["websocket", "polling"],
+        timeout: 15000,
       });
       socketRef.current = socket;
 
+      const connectTimeout = setTimeout(() => {
+        if (!socket.connected) {
+          socket.close();
+          cleanup();
+        }
+      }, 15000);
+
       socket.on("connect", () => {
+        clearTimeout(connectTimeout);
         setIsConnected(true);
         socket.emit("join-room", { roomId, userId, name, role });
       });
 
-      socket.on("disconnect", () => setIsConnected(false));
+      socket.on("connect_error", () => {
+        clearTimeout(connectTimeout);
+      });
+
+      socket.on("disconnect", (reason) => {
+        setIsConnected(false);
+        if (reason === "io server disconnect" || reason === "transport close") {
+          setTimeout(() => {
+            if (socketRef.current && !socketRef.current.connected) {
+              socketRef.current.connect();
+            }
+          }, 3000);
+        }
+      });
 
       socket.on(
         "room-peers",

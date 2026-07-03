@@ -87,12 +87,19 @@ function PhotoMosaic() {
 }
 
 export function LoginPage({ pendingRoom }: { pendingRoom?: number | null }) {
-  const { login } = useAuth()
+  const { login, registerNewcomer } = useAuth()
   const [email, setEmail] = useState('britishce44@gmail.com')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [showRegister, setShowRegister] = useState(false)
   const [onboardingName, setOnboardingName] = useState<string | null>(null)
+  const [showNewcomer, setShowNewcomer] = useState(false)
+  const [newcomerDone, setNewcomerDone] = useState(false)
+  const [newcomerLoading, setNewcomerLoading] = useState(false)
+  const [newcomerForm, setNewcomerForm] = useState({
+    firstName: '', lastName: '', age: '', city: '', country: '',
+    gmail: '', callPhone: '', whatsappPhone: '',
+  })
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -111,11 +118,39 @@ export function LoginPage({ pendingRoom }: { pendingRoom?: number | null }) {
     } finally { setLoading(false) }
   }
 
+  const handleNewcomerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newcomerForm.firstName || !newcomerForm.lastName || !newcomerForm.gmail) {
+      toast.error('Please fill in first name, last name, and gmail'); return
+    }
+    setNewcomerLoading(true)
+    try {
+      await registerNewcomer({
+        id: '', firstName: newcomerForm.firstName, lastName: newcomerForm.lastName,
+        age: newcomerForm.age, city: newcomerForm.city, country: newcomerForm.country,
+        gmail: newcomerForm.gmail, callPhone: newcomerForm.callPhone,
+        whatsappPhone: newcomerForm.whatsappPhone,
+        registeredAt: new Date().toISOString(), status: 'waiting',
+      })
+      setNewcomerDone(true)
+      toast.success('Registration submitted! The supervisor will contact you soon.')
+    } catch (err: any) {
+      toast.error(err.message || 'Registration failed')
+    } finally { setNewcomerLoading(false) }
+  }
+
+  const goToAcademicRoom = () => {
+    // Newcomer registration is just a form submission — go back to login.
+    setShowNewcomer(false)
+    setNewcomerDone(false)
+  }
+
   if (onboardingName !== null) {
     return <OnboardingFlow studentName={onboardingName} onComplete={() => setOnboardingName(null)} />
   }
 
   if (showRegister) return <RegisterForm onBack={() => setShowRegister(false)} onRegistered={(name) => { setShowRegister(false); setOnboardingName(name) }} />
+  if (showNewcomer) return <NewcomerForm form={newcomerForm} setForm={setNewcomerForm} onSubmit={handleNewcomerSubmit} loading={newcomerLoading} done={newcomerDone} onMeetSupervisor={goToAcademicRoom} onBack={() => { setShowNewcomer(false); setNewcomerDone(false) }} />
 
   return (
     <div className="h-screen flex items-center justify-center p-4 relative overflow-hidden">
@@ -238,6 +273,17 @@ export function LoginPage({ pendingRoom }: { pendingRoom?: number | null }) {
                 </button>
               </div>
 
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-indigo-500/20" /></div>
+                <div className="relative flex justify-center"><span className="px-3 text-[10px] text-indigo-400/60" style={{ background: 'rgba(14,30,80,0.82)' }}>OR</span></div>
+              </div>
+
+              <button type="button" onClick={() => setShowNewcomer(true)}
+                className="w-full py-3 rounded-xl font-bold text-xs transition-all"
+                style={{ background: 'rgba(212,160,23,0.15)', color: '#D4A017', border: '1px solid rgba(212,160,23,0.30)', fontFamily: 'Cairo, sans-serif' }}>
+                🆕 طالب جديد؟ سجل للمقابلة · New Student Interview
+              </button>
+
               <div className="mt-3 p-3 rounded-xl" style={{ background: 'rgba(27,62,166,0.12)', border: '1px solid rgba(37,99,235,0.18)' }}>
                 <p className="text-[9px] text-blue-300/70 text-center font-mono">
                   Demo Admin: britishce44@gmail.com / admin123
@@ -329,4 +375,90 @@ function RegisterForm({ onBack, onRegistered }: { onBack: () => void; onRegister
       </div>
     </div>
   )
+}
+
+/* ─── Newcomer Interview Registration Form ─── */
+function NewcomerForm({
+  form, setForm, onSubmit, loading, done, onMeetSupervisor, onBack,
+}: {
+  form: typeof defaultNewcomerForm; setForm: (f: typeof defaultNewcomerForm) => void
+  onSubmit: (e: React.FormEvent) => Promise<void>; loading: boolean; done: boolean
+  onMeetSupervisor: () => void; onBack: () => void
+}) {
+  const inputCls = "w-full rounded-xl px-3 py-2.5 text-sm text-white outline-none transition bg-white/5 border border-indigo-500/20 placeholder-gray-600 focus:border-indigo-500/50"
+
+  if (done) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+        <PhotoMosaic />
+        <div className="relative z-10 w-full max-w-md rounded-2xl overflow-hidden animate-slide-up"
+          style={{ background: 'rgba(14,30,80,0.85)', backdropFilter: 'blur(32px)', border: '1px solid rgba(212,160,23,0.30)', boxShadow: '0 32px 64px rgba(0,0,0,0.40)' }}>
+          <div className="h-0.5 golden-gradient" />
+          <div className="p-8 text-center">
+            <div className="w-20 h-20 rounded-full golden-gradient flex items-center justify-center mx-auto mb-4 shadow-lg shadow-golden/30">
+              <span className="text-3xl">✅</span>
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2" style={{ fontFamily: 'Cairo, sans-serif' }}>
+              تم التسجيل بنجاح!
+            </h2>
+            <p className="text-sm text-gray-300 mb-1 font-medium">Registration Successful!</p>
+            <p className="text-xs text-golden-bright/70 mb-6">
+              {form.firstName} {form.lastName} · Your interview request has been sent to the supervisor.
+            </p>
+            <button onClick={onMeetSupervisor}
+              className="w-full py-3.5 rounded-xl font-bold text-sm transition-all golden-gradient text-white shadow-lg shadow-golden/30"
+              style={{ fontFamily: 'Cairo, sans-serif' }}>
+              ← العودة لتسجيل الدخول · Back to Login
+            </button>
+            <button onClick={onBack}
+              className="w-full py-2.5 rounded-xl text-xs text-gray-400 hover:text-white transition mt-2 border border-white/10">
+              ← Back to Login
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      <PhotoMosaic />
+      <div className="relative z-10 w-full max-w-lg rounded-2xl overflow-hidden animate-slide-up"
+        style={{ background: 'rgba(14,30,80,0.85)', backdropFilter: 'blur(32px)', border: '1px solid rgba(212,160,23,0.25)', boxShadow: '0 32px 64px rgba(0,0,0,0.40)' }}>
+        <div className="h-0.5 golden-gradient" />
+        <div className="p-6">
+          <h2 className="text-lg font-bold text-white mb-1 text-center" style={{ fontFamily: 'Cairo, sans-serif' }}>
+            🆕 New Student Interview Registration
+          </h2>
+          <p className="text-xs text-gray-400 mb-5 text-center">Fill in your details to meet the supervisor</p>
+          <form onSubmit={onSubmit} className="grid grid-cols-2 gap-3 text-sm">
+            <input placeholder="First Name *" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} className={`${inputCls} col-span-1`} required />
+            <input placeholder="Last Name *" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} className={`${inputCls} col-span-1`} required />
+            <input type="number" placeholder="Age" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} className={`${inputCls} col-span-1`} />
+            <input placeholder="City" value={form.city} onChange={e => setForm({ ...form, city: e.target.value })} className={`${inputCls} col-span-1`} />
+            <input placeholder="Country" value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} className={`${inputCls} col-span-2`} />
+            <input type="email" placeholder="Gmail *" value={form.gmail} onChange={e => setForm({ ...form, gmail: e.target.value })} className={`${inputCls} col-span-2`} required />
+            <input type="tel" placeholder="Call Phone Number" value={form.callPhone} onChange={e => setForm({ ...form, callPhone: e.target.value })} className={`${inputCls} col-span-1`} />
+            <input type="tel" placeholder="WhatsApp Phone Number" value={form.whatsappPhone} onChange={e => setForm({ ...form, whatsappPhone: e.target.value })} className={`${inputCls} col-span-1`} />
+            <div className="flex gap-3 col-span-2 mt-2">
+              <button type="button" onClick={onBack}
+                className="flex-1 rounded-xl py-2.5 text-sm text-gray-400 hover:text-white transition border border-white/10 hover:border-white/20">
+                ← Back
+              </button>
+              <button type="submit" disabled={loading}
+                className="flex-1 rounded-xl py-2.5 text-sm font-bold transition"
+                style={{ background: loading ? 'rgba(212,160,23,0.50)' : 'linear-gradient(135deg, #D4A017, #F5C518)', color: '#17125c', fontFamily: 'Cairo, sans-serif' }}>
+                {loading ? '⏳ Submitting…' : '✅ Submit Registration'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const defaultNewcomerForm = {
+  firstName: '', lastName: '', age: '', city: '', country: '',
+  gmail: '', callPhone: '', whatsappPhone: '',
 }

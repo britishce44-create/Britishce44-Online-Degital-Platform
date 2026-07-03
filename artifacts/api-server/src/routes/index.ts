@@ -6,6 +6,12 @@ import assessmentRouter from "./assessment";
 import evalRouter from "./eval";
 import reportsRouter from "./reports";
 import opsRouter from "./ops";
+import attendanceRouter from "./attendance";
+import resultsRouter from "./results";
+import usersRouter from "./users";
+import contactsRouter from "./contacts";
+import classroomAssessmentRouter from "./classroom-assessment";
+import quizzesRouter from "./quizzes";
 
 const router: IRouter = Router();
 
@@ -16,5 +22,11 @@ router.use(assessmentRouter);
 router.use(evalRouter);
 router.use(reportsRouter);
 router.use(opsRouter);
+router.use(attendanceRouter);
+router.use(resultsRouter);
+router.use(usersRouter);
+router.use(contactsRouter);
+router.use(classroomAssessmentRouter);
+router.use(quizzesRouter);
 
 export default router;

@@ -24,9 +24,11 @@ const adminItems: NavItem[] = [
   { page: 'reports', icon: '📊', label: 'nav.reports', color: 'from-teal-500 to-teal-600' },
   { page: 'anticheat', icon: '🛡️', label: 'nav.anticheat', color: 'from-red-500 to-red-600' },
   { page: 'homework', icon: '📄', label: 'nav.homework', color: 'from-lime-500 to-lime-600' },
+  { page: 'studentmailbox', icon: '📬', label: 'Student Mailbox', color: 'from-violet-500 to-purple-600' },
   { page: 'videoarchive', icon: '🎞️', label: 'nav.videoarchive', color: 'from-fuchsia-500 to-fuchsia-600' },
   { page: 'liveanalytics', icon: '📈', label: 'nav.liveanalytics', color: 'from-green-500 to-green-600' },
   { page: 'commandcenter', icon: '📊', label: 'nav.commandcenter', color: 'from-indigo-500 to-indigo-600' },
+  { page: 'digitallibrary', icon: '📚', label: 'Digital Library', color: 'from-violet-500 to-purple-600' },
   { page: 'globalsearch', icon: '🔎', label: 'nav.globalsearch', color: 'from-blue-500 to-blue-600' },
   { page: 'notifications', icon: '🔔', label: 'nav.notifications', color: 'from-sky-500 to-blue-600' },
   { page: 'ailearning', icon: '🧠', label: 'nav.ailearning', color: 'from-violet-500 to-purple-600' },
@@ -53,6 +55,7 @@ const teacherItems: NavItem[] = [
   { page: 'homework', icon: '📄', label: 'nav.homework', color: 'from-lime-500 to-lime-600' },
   { page: 'ce4messenger', icon: '💬', label: 'nav.messenger', color: 'from-emerald-500 to-emerald-600' },
   { page: 'videoarchive', icon: '🎞️', label: 'nav.videoarchive', color: 'from-fuchsia-500 to-fuchsia-600' },
+  { page: 'digitallibrary', icon: '📚', label: 'Digital Library', color: 'from-violet-500 to-purple-600' },
   { page: 'globalsearch', icon: '🔎', label: 'nav.globalsearch', color: 'from-blue-500 to-blue-600' },
   { page: 'notifications', icon: '🔔', label: 'nav.notifications', color: 'from-sky-500 to-blue-600' },
   { page: 'statuspage', icon: '🟢', label: 'nav.statuspage', color: 'from-green-500 to-emerald-600' },
@@ -62,6 +65,7 @@ const teacherItems: NavItem[] = [
 const studentItems: NavItem[] = [
   { page: 'dashboard', icon: '🏠', label: 'nav.myDashboard', color: 'from-blue-500 to-blue-600' },
   { page: 'classrooms', icon: '🚪', label: 'nav.classroomsPlain', color: 'from-blue-600 to-blue-700' },
+  { page: 'digitallibrary', icon: '📚', label: 'Digital Library', color: 'from-violet-500 to-purple-600' },
   { page: 'ailearning', icon: '🧠', label: 'nav.ailearning', color: 'from-violet-500 to-purple-600' },
   { page: 'examsystem', icon: '📝', label: 'nav.myExams', color: 'from-sky-500 to-sky-600' },
   { page: 'placementtest', icon: '🎯', label: 'nav.placement', color: 'from-orange-500 to-orange-600' },
@@ -76,6 +80,7 @@ const parentItems: NavItem[] = [
   { page: 'dashboard', icon: '🏠', label: 'nav.myDashboard', color: 'from-blue-500 to-blue-600' },
   { page: 'parentportal', icon: '👨‍👩‍👧', label: 'nav.parentportal', color: 'from-pink-500 to-rose-600' },
   { page: 'ce4messenger', icon: '💬', label: 'nav.messenger', color: 'from-emerald-500 to-emerald-600' },
+  { page: 'digitallibrary', icon: '📚', label: 'Digital Library', color: 'from-violet-500 to-purple-600' },
   { page: 'notifications', icon: '🔔', label: 'nav.notifications', color: 'from-sky-500 to-blue-600' },
   { page: 'reports', icon: '📊', label: 'nav.reports', color: 'from-teal-500 to-teal-600' },
   { page: 'statuspage', icon: '🟢', label: 'nav.statuspage', color: 'from-green-500 to-emerald-600' },
@@ -157,7 +162,7 @@ export function Sidebar({ userRole, currentPage, onNavigate, isOpen, onClose }: 
                     {item.icon}
                   </div>
                   <span className="text-[11px] font-medium truncate flex-1">{t(item.label)}</span>
-                  {isActive && <span className="w-1 h-5 rounded-full bg-emerald-400 flex-shrink-0" />}
+                  {isActive && <span className="w-1 h-5 rounded-full bg-golden-bright flex-shrink-0" />}
                 </button>
               </div>
             )

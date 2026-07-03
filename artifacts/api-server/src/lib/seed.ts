@@ -110,17 +110,17 @@ export async function seedIfEmpty(): Promise<void> {
     CRITERIA.map((c, i) => ({ ...c, orderIndex: i, active: true })),
   );
 
+  const ADMIN_PERMS = ["classrooms","exams","messenger","homework","reports","recordings","placements","analytics","settings","users","assessment","attendance","results","videoeditor","marketing","ailearning","parentportal"];
+
   const userRows: {
-    email: string;
-    password: string;
-    name: string;
+    email: string; password: string; name: string;
     role: "admin" | "supervisor" | "teacher" | "student" | "parent";
-    teacherId: number | null;
-    parentId: number | null;
-    studentId: number | null;
+    teacherId: number | null; parentId: number | null; studentId: number | null;
+    status: string; phone: string; permissions: string[];
+    accessFrom: string; accessTo: string;
   }[] = [
-    { email: "britishce44@gmail.com", password: "admin123", name: "Admin Britishce44", role: "admin", teacherId: null, parentId: null, studentId: null },
-    { email: "supervisor@britishce44.edu", password: "supervisor123", name: "Supervisor B44", role: "supervisor", teacherId: null, parentId: null, studentId: null },
+    { email: "britishce44@gmail.com", password: "admin123", name: "Admin Britishce44", role: "admin", teacherId: null, parentId: null, studentId: null, status: "active", phone: "+967 770 000 001", permissions: ADMIN_PERMS, accessFrom: "00:00", accessTo: "23:59" },
+    { email: "supervisor@britishce44.edu", password: "supervisor123", name: "Supervisor B44", role: "supervisor", teacherId: null, parentId: null, studentId: null, status: "active", phone: "+967 770 000 006", permissions: ADMIN_PERMS, accessFrom: "06:00", accessTo: "23:00" },
   ];
 
   for (const t of TEACHERS) {
@@ -149,6 +149,11 @@ export async function seedIfEmpty(): Promise<void> {
       teacherId: teacher.id,
       parentId: null,
       studentId: null,
+      status: "active",
+      phone: "",
+      permissions: ["classrooms","exams","messenger","homework","reports","recordings"],
+      accessFrom: "07:00",
+      accessTo: "22:00",
     });
 
     for (const s of t.course.students) {
@@ -174,6 +179,11 @@ export async function seedIfEmpty(): Promise<void> {
         teacherId: null,
         parentId: parent.id,
         studentId: null,
+        status: "active",
+        phone: "",
+        permissions: ["reports","messenger"],
+        accessFrom: "06:00",
+        accessTo: "23:00",
       });
 
       // Daily AI monitoring summaries (second input for reports).
@@ -313,6 +323,11 @@ export async function seedEval(): Promise<void> {
         teacherId,
         parentId: null,
         studentId: null,
+        status: "active",
+        phone: "",
+        permissions: ["classrooms","exams","messenger","homework","reports","recordings"],
+        accessFrom: "07:00",
+        accessTo: "22:00",
       });
     }
   }
