@@ -9,7 +9,6 @@ interface Props {
 export function AppLogin({ prefill, onComplete }: Props) {
   const { setStudent, syncSchedule, refreshConfig } = useAppState()
   const [name, setName] = useState(prefill?.name || '')
-  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -21,58 +20,61 @@ export function AppLogin({ prefill, onComplete }: Props) {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!name.trim() || !password.trim()) { setError('Enter name and password'); return }
+    if (!name.trim()) { setError('Please enter your name'); return }
     setLoading(true); setError('')
     try {
+      /* Try API login with name-only (no password needed) */
       const email = `${name.toLowerCase().replace(/\s+/g, '.')}@student.britishce44.com`
       const res = await fetch('/api/v1/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password: 'student' }),
       })
-      if (!res.ok) {
-        /* Fallback: try direct token login for pre-configured devices */
-        if (prefill?.token) {
-          const verify = await fetch('/api/v1/auth/me', {
-            headers: { Authorization: `Bearer ${prefill.token}` },
-          })
-          if (verify.ok) {
-            const data = await verify.json()
-            const student: AppStudentData = {
-              id: data.user.id, name: data.user.name || name,
-              email: data.user.email, phone: data.user.phone || '',
-              teacher: data.user.teacher || '', classroomNum: data.user.classroomNum || 0,
-              level: data.user.level || '', startTime: data.user.startTime || '',
-              endTime: data.user.endTime || '', startDate: data.user.startDate || '',
-              endDate: data.user.endDate || '', permissions: data.user.permissions || [],
-              settings: data.user.settings || {}, dashboardConfig: data.user.dashboardConfig || {},
-              token: prefill.token,
-            }
-            setStudent(student)
-            localStorage.setItem('b44_app_token', prefill.token)
-            syncSchedule(); refreshConfig(); onComplete()
-            return
-          }
+      if (res.ok) {
+        const data = await res.json()
+        const student: AppStudentData = {
+          id: data.user.id, name: data.user.name || name,
+          email: data.user.email, phone: data.user.phone || '',
+          teacher: data.user.teacher || '', classroomNum: data.user.classroomNum || 0,
+          level: data.user.level || '', startTime: data.user.startTime || '',
+          endTime: data.user.endTime || '', startDate: data.user.startDate || '',
+          endDate: data.user.endDate || '', permissions: data.user.permissions || [],
+          settings: data.user.settings || {}, dashboardConfig: data.user.dashboardConfig || {},
+          token: data.accessToken,
         }
-        throw new Error('Invalid credentials')
+        setStudent(student)
+        localStorage.setItem('b44_app_token', data.accessToken)
+        syncSchedule(); refreshConfig(); onComplete()
+        return
       }
-      const data = await res.json()
-      const student: AppStudentData = {
-        id: data.user.id, name: data.user.name || name,
-        email: data.user.email, phone: data.user.phone || '',
-        teacher: data.user.teacher || '', classroomNum: data.user.classroomNum || 0,
-        level: data.user.level || '', startTime: data.user.startTime || '',
-        endTime: data.user.endTime || '', startDate: data.user.startDate || '',
-        endDate: data.user.endDate || '', permissions: data.user.permissions || [],
-        settings: data.user.settings || {}, dashboardConfig: data.user.dashboardConfig || {},
-        token: data.accessToken,
+
+      /* Fallback: local-only login (no server needed) */
+      const localStudent: AppStudentData = {
+        id: Date.now(),
+        name: name.trim(),
+        email: `${name.toLowerCase().replace(/\s+/g, '.')}@student.britishce44.com`,
+        phone: '', teacher: '', classroomNum: 0, level: '',
+        startTime: '', endTime: '', startDate: '', endDate: '',
+        permissions: [], settings: {}, dashboardConfig: {},
+        token: `local-${Date.now()}`,
       }
-      setStudent(student)
-      localStorage.setItem('b44_app_token', data.accessToken)
-      syncSchedule(); refreshConfig()
-      onComplete()
-    } catch (err: any) {
-      setError(err.message || 'Login failed')
+      setStudent(localStudent)
+      localStorage.setItem('b44_app_token', localStudent.token)
+      syncSchedule(); refreshConfig(); onComplete()
+    } catch {
+      /* Network error — login locally anyway */
+      const localStudent: AppStudentData = {
+        id: Date.now(),
+        name: name.trim(),
+        email: `${name.toLowerCase().replace(/\s+/g, '.')}@student.britishce44.com`,
+        phone: '', teacher: '', classroomNum: 0, level: '',
+        startTime: '', endTime: '', startDate: '', endDate: '',
+        permissions: [], settings: {}, dashboardConfig: {},
+        token: `local-${Date.now()}`,
+      }
+      setStudent(localStudent)
+      localStorage.setItem('b44_app_token', localStudent.token)
+      syncSchedule(); refreshConfig(); onComplete()
     } finally { setLoading(false) }
   }
 
@@ -90,13 +92,7 @@ export function AppLogin({ prefill, onComplete }: Props) {
             <label className="text-xs text-gray-400 font-semibold mb-1 block">Student Name</label>
             <input value={name} onChange={e => setName(e.target.value)}
               className="w-full rounded-xl px-4 py-3 text-sm text-white outline-none bg-white/5 border border-indigo-500/20 focus:border-golden/50 placeholder-gray-600 transition"
-              placeholder="Your name as registered" readOnly={!!prefill} />
-          </div>
-          <div>
-            <label className="text-xs text-gray-400 font-semibold mb-1 block">Password</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-              className="w-full rounded-xl px-4 py-3 text-sm text-white outline-none bg-white/5 border border-indigo-500/20 focus:border-golden/50 placeholder-gray-600 transition"
-              placeholder="Enter your password" autoFocus />
+              placeholder="Enter your name" autoFocus readOnly={!!prefill} />
           </div>
           {error && <p className="text-xs text-red-400 bg-red-500/10 rounded-xl px-3 py-2 border border-red-500/20">{error}</p>}
           <button type="submit" disabled={loading}
@@ -107,7 +103,7 @@ export function AppLogin({ prefill, onComplete }: Props) {
         </form>
 
         <p className="text-[10px] text-gray-600 mt-8 text-center max-w-xs">
-          This app is pre-configured for your account. Contact your supervisor if you need help.
+          Enter your name to access the app. No password required.
         </p>
       </div>
     </div>
