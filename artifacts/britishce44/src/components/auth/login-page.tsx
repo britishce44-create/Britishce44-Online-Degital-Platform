@@ -265,24 +265,16 @@ export function LoginPage({ pendingRoom }: { pendingRoom?: number | null }) {
                 {loading ? '⚙ جاري تسجيل الدخول…' : '→ تسجيل الدخول / Sign In'}
               </button>
 
-              <div className="text-center pt-1">
-                <button type="button" onClick={() => setShowRegister(true)}
-                  className="text-[11px] text-indigo-400 hover:text-indigo-300 transition underline underline-offset-2"
-                  style={{ fontFamily: 'Tajawal, sans-serif' }}>
-                  طالب جديد أو ولي أمر؟ سجل هنا · New? Register Here
-                </button>
-              </div>
-
               <div className="relative my-4">
                 <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-indigo-500/20" /></div>
                 <div className="relative flex justify-center"><span className="px-3 text-[10px] text-indigo-400/60" style={{ background: 'rgba(14,30,80,0.82)' }}>OR</span></div>
               </div>
 
-              <button type="button" onClick={() => setShowNewcomer(true)}
-                className="w-full py-3 rounded-xl font-bold text-xs transition-all"
+              <a href="/interview"
+                className="w-full py-3 rounded-xl font-bold text-xs transition-all block text-center"
                 style={{ background: 'rgba(212,160,23,0.15)', color: '#D4A017', border: '1px solid rgba(212,160,23,0.30)', fontFamily: 'Cairo, sans-serif' }}>
-                🆕 طالب جديد؟ سجل للمقابلة · New Student Interview
-              </button>
+                🆕 طالب جديد؟ ادخل غرفة المقابلة · New Student Interview Room
+              </a>
 
               <div className="mt-3 p-3 rounded-xl" style={{ background: 'rgba(27,62,166,0.12)', border: '1px solid rgba(37,99,235,0.18)' }}>
                 <p className="text-[9px] text-blue-300/70 text-center font-mono">

@@ -7,6 +7,7 @@ import { LoginPage } from './components/auth/login-page'
 import { DashboardLayout } from './components/layout/dashboard-layout'
 import { StudentAppPage } from './pages/student-app-page'
 import { AppDownloadPage } from './pages/app-download-page'
+import { CyberInterviewRoom } from './pages/cyber-interview-room'
 import { WebRTCProvider } from './components/webrtc/webrtc-provider'
 import { ClassroomRoom } from './components/classroom/classroom-room'
 
@@ -81,6 +82,11 @@ function AppContent() {
   /* App download/install page */
   if (path === '/app-download') {
     return <AppDownloadPage />
+  }
+
+  /* Cyber Interview Room — standalone, no login required */
+  if (path === '/interview') {
+    return <CyberInterviewRoom />
   }
 
   if (isLoading) {
