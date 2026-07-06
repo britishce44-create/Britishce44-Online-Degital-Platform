@@ -37,18 +37,24 @@ router.post("/v1/users", requireAuth, requireRole("admin", "supervisor"), async 
   if (existing) return res.status(409).json({ message: "Email already exists" });
 
   // Auto-create linked teacher / student / parent records and wire the FK.
+  // Wrapped in try/catch so user creation never fails if the linked table
+  // insert has an issue.
   let teacherId: number | null = null;
   let studentId: number | null = null;
   let parentId: number | null = null;
-  if (role === "teacher") {
-    const [t] = await db.insert(teachers).values({ name, email }).returning();
-    teacherId = t.id;
-  } else if (role === "student") {
-    const [s] = await db.insert(students).values({ name }).returning();
-    studentId = s.id;
-  } else if (role === "parent") {
-    const [p] = await db.insert(parents).values({ name, email }).returning();
-    parentId = p.id;
+  try {
+    if (role === "teacher") {
+      const [t] = await db.insert(teachers).values({ name, email }).returning();
+      teacherId = t.id;
+    } else if (role === "student") {
+      const [s] = await db.insert(students).values({ name }).returning();
+      studentId = s.id;
+    } else if (role === "parent") {
+      const [p] = await db.insert(parents).values({ name, email }).returning();
+      parentId = p.id;
+    }
+  } catch (linkErr) {
+    // If the linked record can't be created, still create the user without the link
   }
 
   const [row] = await db.insert(appUsers).values({

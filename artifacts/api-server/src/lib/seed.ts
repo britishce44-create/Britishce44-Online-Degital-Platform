@@ -417,7 +417,24 @@ export async function seedEval(): Promise<void> {
           active: true,
         };
       });
-    if (toInsert.length) await db.insert(evalCriteria).values(toInsert);
+    if (toInsert.length) {
+      try {
+        await db.insert(evalCriteria).values(toInsert);
+      } catch (err) {
+        // If the new columns (weight/feedback/etc.) don't exist yet, retry
+        // without them so the criteria still get seeded.
+        try {
+          const fallback = toInsert.map((c: any) => ({
+            templateId: c.templateId, key: c.key, labelEn: c.labelEn,
+            labelAr: c.labelAr, kind: c.kind, maxScore: c.maxScore,
+            orderIndex: c.orderIndex, active: c.active,
+          }));
+          await db.insert(evalCriteria).values(fallback as any);
+        } catch (err2) {
+          logger.warn({ err: err2, tpl: tpl.key }, "Eval criteria seed failed (even fallback) — schema may need updating");
+        }
+      }
+    }
 
     const week = tpl.layout === "weekly" ? "Week 1" : "";
     const sheet = await db

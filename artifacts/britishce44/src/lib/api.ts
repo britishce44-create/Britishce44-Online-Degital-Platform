@@ -153,16 +153,16 @@ export interface EvalCriterion {
   labelAr: string | null
   kind: EvalCritKind
   maxScore: number
-  weight: string
-  isKpi: boolean
-  feedback: {
+  weight?: string
+  isKpi?: boolean
+  feedback?: {
     weak: { en: { reason: string; feedback: string; rec: string }; ar: { reason: string; feedback: string; rec: string } }
     developing: { en: { reason: string; feedback: string; rec: string }; ar: { reason: string; feedback: string; rec: string } }
     strong: { en: { reason: string; feedback: string; rec: string }; ar: { reason: string; feedback: string; rec: string } }
     video: string
     website: string
   } | null
-  tierBoundaries: { weak: [number, number]; developing: [number, number]; strong: [number, number] } | null
+  tierBoundaries?: { weak: [number, number]; developing: [number, number]; strong: [number, number] } | null
   orderIndex: number
   active: boolean
 }

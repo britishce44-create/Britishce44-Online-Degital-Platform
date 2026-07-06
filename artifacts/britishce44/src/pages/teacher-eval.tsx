@@ -304,7 +304,7 @@ export function TeacherEvalPage() {
       }
       if (!vals.length) continue
       const avg = vals.reduce((a, b) => a + b, 0) / vals.length
-      const w = Number(c.weight)
+      const w = Number(c.weight) || 1
       total += avg * w
       maxTotal += c.maxScore * w
     }
@@ -463,7 +463,7 @@ export function TeacherEvalPage() {
                           {grid.criteria.filter(c => c.kind === 'score').map(c => (
                             <th key={c.id} style={thStyle} title={c.labelAr || c.labelEn}>
                               {(lang === 'ar' ? c.labelAr : c.labelEn) || c.labelEn}
-                              <div style={{ fontSize: '0.7rem', color: GOLD, marginTop: 2 }}>/{c.maxScore} · w{c.weight}</div>
+                              <div style={{ fontSize: '0.7rem', color: GOLD, marginTop: 2 }}>/{c.maxScore} · w{Number(c.weight) || 1}</div>
                             </th>
                           ))}
                           <th style={thStyle}>{t('teacherEval.overallScore')}</th>
