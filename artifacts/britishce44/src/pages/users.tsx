@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { ContactsManager } from '@/components/contacts/contacts-manager'
 import { motion, AnimatePresence } from 'framer-motion'
-import { apiGet, apiPost, apiPatch, apiDelete, ApiError } from '@/lib/api'
+import { apiGet, apiPost, apiPatch, apiDelete, ApiError, type Course } from '@/lib/api'
 
 type Tab = 'users' | 'contacts'
 type Role = 'admin' | 'teacher' | 'student' | 'supervisor' | 'parent'
@@ -12,6 +12,7 @@ interface ApiUser {
   phone: string; status: Status; permissions: string[];
   accessFrom: string; accessTo: string;
   dashboardConfig: Record<string, boolean>;
+  teacherId?: number | null; studentId?: number | null; parentId?: number | null;
   lastSeen: string; createdAt: string; updatedAt: string;
 }
 
@@ -178,6 +179,12 @@ function UserModal({
             </div>
           </div>
 
+          {/* Teacher Courses & Rooms panel */}
+          {role === 'teacher' && <TeacherCoursesPanel userId={user?.id ?? 0} teacherId={user?.teacherId ?? null} teacherName={name} />}
+
+          {/* Student course assignment panel */}
+          {role === 'student' && <StudentCoursePanel userId={user?.id ?? 0} studentId={user?.studentId ?? null} />}
+
           {/* Permissions */}
           <div className="mb-6 p-5 rounded-xl bg-blue-50 border border-blue-100">
             <div className="flex items-center justify-between mb-3">
@@ -258,6 +265,247 @@ function DeleteConfirm({ id, name, onConfirm, onClose }: { id: number; name: str
           <button onClick={() => onConfirm(id)} className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition shadow-lg shadow-red-200">Delete Permanently</button>
         </div>
       </motion.div>
+    </div>
+  )
+}
+
+/* ── Teacher Courses & Rooms panel ── */
+const WEEKDAY_OPTIONS = [
+  { n: 0, label: 'Sun' }, { n: 1, label: 'Mon' }, { n: 2, label: 'Tue' },
+  { n: 3, label: 'Wed' }, { n: 4, label: 'Thu' }, { n: 5, label: 'Fri' }, { n: 6, label: 'Sat' },
+]
+
+function TeacherCoursesPanel({ userId, teacherId, teacherName }: { userId: number; teacherId: number | null; teacherName: string }) {
+  const [courses, setCourses] = useState<Course[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  const [showAdd, setShowAdd] = useState(false)
+  const [newCourse, setNewCourse] = useState({
+    name: '', level: '', room: '', startTime: '08:00', endTime: '09:30',
+    termLabel: 'Term 1', termStartDate: new Date().toISOString().split('T')[0],
+    teachingWeekdays: [0, 1, 2, 3, 4] as number[],
+  })
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editData, setEditData] = useState<{ room: string; startTime: string; endTime: string; level: string; name: string }>({ room: '', startTime: '', endTime: '', level: '', name: '' })
+
+  const load = async () => {
+    if (!teacherId) { setLoading(false); return }
+    try {
+      const r = await apiGet<{ courses: Course[] }>(`/classroom-assessment/teachers/${teacherId}/courses`)
+      setCourses(r.courses)
+    } catch { /* ignore */ }
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [teacherId])
+
+  const addCourse = async () => {
+    if (!newCourse.name.trim()) { setMsg({ kind: 'err', text: 'Course name is required' }); return }
+    if (!teacherId) { setMsg({ kind: 'err', text: 'Save the teacher first, then add courses' }); return }
+    setBusy(true)
+    try {
+      await apiPost('/courses', {
+        teacherId, name: newCourse.name.trim(), level: newCourse.level || null,
+        termLabel: newCourse.termLabel, termStartDate: newCourse.termStartDate,
+        teachingWeekdays: newCourse.teachingWeekdays,
+        room: newCourse.room || null, startTime: newCourse.startTime || null, endTime: newCourse.endTime || null,
+      })
+      setMsg({ kind: 'ok', text: 'Course added' })
+      setNewCourse({ ...newCourse, name: '', level: '', room: '' })
+      setShowAdd(false)
+      await load()
+    } catch (e) {
+      setMsg({ kind: 'err', text: e instanceof ApiError ? e.message : 'Failed to add course' })
+    } finally { setBusy(false) }
+  }
+
+  const saveEdit = async (id: number) => {
+    setBusy(true)
+    try {
+      await apiPatch(`/courses/${id}`, editData)
+      setMsg({ kind: 'ok', text: 'Course updated' })
+      setEditingId(null)
+      await load()
+    } catch (e) {
+      setMsg({ kind: 'err', text: e instanceof ApiError ? e.message : 'Failed' })
+    } finally { setBusy(false) }
+  }
+
+  const deleteCourse = async (id: number) => {
+    if (!confirm('Delete this course? Students will be unenrolled.')) return
+    setBusy(true)
+    try {
+      await apiDelete(`/courses/${id}`)
+      setMsg({ kind: 'ok', text: 'Course deleted' })
+      await load()
+    } catch (e) {
+      setMsg({ kind: 'err', text: e instanceof ApiError ? e.message : 'Failed' })
+    } finally { setBusy(false) }
+  }
+
+  const toggleWeekday = (arr: number[], n: number) => arr.includes(n) ? arr.filter(x => x !== n) : [...arr, n].sort()
+
+  const startEdit = (c: Course) => {
+    setEditingId(c.id)
+    setEditData({ room: c.room ?? '', startTime: c.startTime ?? '', endTime: c.endTime ?? '', level: c.level ?? '', name: c.name })
+  }
+
+  const inp = "w-full rounded-lg px-3 py-2 text-sm text-gray-900 bg-white border border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none placeholder:text-gray-400 transition"
+
+  return (
+    <div className="mb-6 p-5 rounded-xl bg-sky-50 border border-sky-100">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-bold text-sky-900">🏫 Teacher Courses & Rooms {teacherName && <span className="text-sky-500 font-normal">— {teacherName}</span>}</p>
+        <button onClick={() => setShowAdd(v => !v)} className="text-xs px-3 py-1.5 rounded-full font-semibold bg-sky-600 text-white hover:bg-sky-700 transition">+ Add Course</button>
+      </div>
+
+      {msg && <div className={`mb-3 px-3 py-2 rounded-lg text-xs font-medium ${msg.kind === 'ok' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>{msg.text}</div>}
+
+      {loading ? (
+        <p className="text-xs text-sky-400">Loading courses…</p>
+      ) : courses.length === 0 && !showAdd ? (
+        <p className="text-xs text-sky-400 py-2">No courses assigned yet. Click "+ Add Course" to create one with a room and time slot.</p>
+      ) : (
+        <div className="space-y-2 mb-3">
+          {courses.map(c => (
+            <div key={c.id} className="p-3 rounded-lg bg-white border border-sky-100">
+              {editingId === c.id ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  <input className={inp} value={editData.name} onChange={e => setEditData({ ...editData, name: e.target.value })} placeholder="Course name" />
+                  <input className={inp} value={editData.level} onChange={e => setEditData({ ...editData, level: e.target.value })} placeholder="Level" />
+                  <input className={inp} value={editData.room} onChange={e => setEditData({ ...editData, room: e.target.value })} placeholder="Room (e.g. LAB 3)" />
+                  <input type="time" className={inp} value={editData.startTime} onChange={e => setEditData({ ...editData, startTime: e.target.value })} />
+                  <input type="time" className={inp} value={editData.endTime} onChange={e => setEditData({ ...editData, endTime: e.target.value })} />
+                  <div className="flex gap-2">
+                    <button onClick={() => saveEdit(c.id)} disabled={busy} className="px-3 py-2 rounded-lg text-xs font-bold bg-sky-600 text-white hover:bg-sky-700 transition">💾 Save</button>
+                    <button onClick={() => setEditingId(null)} className="px-3 py-2 rounded-lg text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-3 flex-wrap text-xs">
+                    <strong className="text-sm text-gray-800">{c.name}</strong>
+                    {c.level && <span className="px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 font-semibold">{c.level}</span>}
+                    {c.room && <span className="text-gray-600">🏫 {c.room}</span>}
+                    {c.startTime && <span className="text-gray-600">⏰ {c.startTime}{c.endTime ? `–${c.endTime}` : ''}</span>}
+                    <span className="text-gray-400">{(c.teachingWeekdays || []).map(w => WEEKDAY_OPTIONS.find(d => d.n === w)?.label).filter(Boolean).join(', ')}</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <button onClick={() => startEdit(c)} className="p-1.5 rounded-lg text-sky-600 hover:bg-sky-50 transition text-xs">✏️</button>
+                    <button onClick={() => deleteCourse(c.id)} className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition text-xs">🗑️</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add new course form */}
+      {showAdd && (
+        <div className="p-4 rounded-lg bg-white border border-sky-200 space-y-3">
+          <p className="text-xs font-bold text-sky-800">New Course</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-[10px] font-semibold text-sky-700 mb-1">Course Name *</label>
+              <input className={inp} value={newCourse.name} onChange={e => setNewCourse({ ...newCourse, name: e.target.value })} placeholder="e.g. English B1, IELTS Prep" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-sky-700 mb-1">Level</label>
+              <input className={inp} value={newCourse.level} onChange={e => setNewCourse({ ...newCourse, level: e.target.value })} placeholder="e.g. B1, A2, Grade 5" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-sky-700 mb-1">Room</label>
+              <input className={inp} value={newCourse.room} onChange={e => setNewCourse({ ...newCourse, room: e.target.value })} placeholder="e.g. LAB 3, Room A" />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-sky-700 mb-1">Start Time</label>
+              <input type="time" className={inp} value={newCourse.startTime} onChange={e => setNewCourse({ ...newCourse, startTime: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-sky-700 mb-1">End Time</label>
+              <input type="time" className={inp} value={newCourse.endTime} onChange={e => setNewCourse({ ...newCourse, endTime: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-sky-700 mb-1">Term Label</label>
+              <input className={inp} value={newCourse.termLabel} onChange={e => setNewCourse({ ...newCourse, termLabel: e.target.value })} placeholder="Term 1" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-[10px] font-semibold text-sky-700 mb-1">Teaching Days</label>
+            <div className="flex gap-1.5 flex-wrap">
+              {WEEKDAY_OPTIONS.map(d => (
+                <button key={d.n} onClick={() => setNewCourse({ ...newCourse, teachingWeekdays: toggleWeekday(newCourse.teachingWeekdays, d.n) })}
+                  className="px-2.5 py-1 rounded-lg text-xs font-bold transition"
+                  style={{
+                    background: newCourse.teachingWeekdays.includes(d.n) ? '#0284c7' : '#f1f5f9',
+                    color: newCourse.teachingWeekdays.includes(d.n) ? '#fff' : '#64748b',
+                  }}>{d.label}</button>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={addCourse} disabled={busy} className="px-4 py-2 rounded-lg text-xs font-bold bg-sky-600 text-white hover:bg-sky-700 transition disabled:opacity-50">{busy ? 'Adding…' : '+ Add Course'}</button>
+            <button onClick={() => setShowAdd(false)} className="px-4 py-2 rounded-lg text-xs font-medium text-gray-500 bg-gray-50 border border-gray-200">Cancel</button>
+          </div>
+          {!teacherId && <p className="text-[10px] text-amber-600 bg-amber-50 px-2 py-1 rounded">⚠ Save the user first (click "Create User"), then reopen to add courses.</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Student course assignment panel ── */
+function StudentCoursePanel({ userId, studentId }: { userId: number; studentId: number | null }) {
+  const [allCourses, setAllCourses] = useState<Course[]>([])
+  const [selectedCourse, setSelectedCourse] = useState<number | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+
+  const load = async () => {
+    try {
+      // Fetch all teachers' courses by fetching each teacher's courses — or use a simple all-courses endpoint
+      // For simplicity, fetch teachers first then courses
+      const tr = await apiGet<{ teachers: { id: number; name: string }[] }>('/classroom-assessment/teachers')
+      const all: Course[] = []
+      for (const t of tr.teachers) {
+        try {
+          const r = await apiGet<{ courses: Course[] }>(`/classroom-assessment/teachers/${t.id}/courses`)
+          all.push(...r.courses.map(c => ({ ...c, teacherName: t.name })))
+        } catch { /* skip */ }
+      }
+      setAllCourses(all)
+    } catch { /* ignore */ }
+  }
+
+  useEffect(() => { load() }, [])
+
+  const assign = async () => {
+    if (!selectedCourse || !studentId) return
+    setBusy(true)
+    try {
+      await apiPost(`/courses/${selectedCourse}/assign-student`, { studentId })
+      setMsg({ kind: 'ok', text: 'Student assigned to course' })
+    } catch (e) {
+      setMsg({ kind: 'err', text: e instanceof ApiError ? e.message : 'Failed' })
+    } finally { setBusy(false) }
+  }
+
+  const inp = "w-full rounded-lg px-3 py-2 text-sm text-gray-900 bg-white border border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition"
+
+  return (
+    <div className="mb-6 p-5 rounded-xl bg-indigo-50 border border-indigo-100">
+      <p className="text-sm font-bold text-indigo-900 mb-3">📚 Assign to Course</p>
+      {msg && <div className={`mb-3 px-3 py-2 rounded-lg text-xs font-medium ${msg.kind === 'ok' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>{msg.text}</div>}
+      {!studentId && <p className="text-[10px] text-amber-600 bg-amber-50 px-2 py-1 rounded mb-2">⚠ Save the student first, then reopen to assign a course.</p>}
+      <div className="flex gap-2">
+        <select className={inp} value={selectedCourse ?? ''} onChange={e => setSelectedCourse(Number(e.target.value))} disabled={!studentId}>
+          <option value="">— Select a course —</option>
+          {allCourses.map(c => <option key={c.id} value={c.id}>{c.name} {c.level ? `(${c.level})` : ''} {(c as any).teacherName ? `· ${(c as any).teacherName}` : ''}{c.room ? ` · ${c.room}` : ''}</option>)}
+        </select>
+        <button onClick={assign} disabled={busy || !selectedCourse || !studentId} className="px-4 py-2 rounded-lg text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition disabled:opacity-50">Assign</button>
+      </div>
     </div>
   )
 }

@@ -586,4 +586,72 @@ router.post("/v1/classroom-assessment/enroll", async (req, res) => {
   return res.json({ ok: true });
 });
 
+/* ── Course CRUD: create / update courses with room + time ──────────────── */
+
+router.post("/v1/courses", async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || (user.role !== "admin" && user.role !== "supervisor"))
+    return res.status(403).json({ message: "Forbidden" });
+  const { teacherId, name, level, termLabel, termStartDate, teachingWeekdays, room, startTime, endTime } = req.body ?? {};
+  if (!name || !termLabel || !termStartDate) return res.status(400).json({ message: "name, termLabel, termStartDate required" });
+  const [row] = await db.insert(courses).values({
+    name, level: level ?? null, teacherId: teacherId ? Number(teacherId) : null,
+    termLabel, termStartDate,
+    teachingWeekdays: Array.isArray(teachingWeekdays) ? teachingWeekdays : [],
+    room: room ?? null, startTime: startTime ?? null, endTime: endTime ?? null,
+  }).returning();
+  return res.json({ course: row });
+});
+
+router.patch("/v1/courses/:id", async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || (user.role !== "admin" && user.role !== "supervisor"))
+    return res.status(403).json({ message: "Forbidden" });
+  const id = Number(req.params.id);
+  const { name, level, teacherId, termLabel, termStartDate, teachingWeekdays, room, startTime, endTime } = req.body ?? {};
+  const set: Record<string, unknown> = {};
+  if (name !== undefined) set.name = name;
+  if (level !== undefined) set.level = level;
+  if (teacherId !== undefined) set.teacherId = teacherId;
+  if (termLabel !== undefined) set.termLabel = termLabel;
+  if (termStartDate !== undefined) set.termStartDate = termStartDate;
+  if (teachingWeekdays !== undefined) set.teachingWeekdays = teachingWeekdays;
+  if (room !== undefined) set.room = room;
+  if (startTime !== undefined) set.startTime = startTime;
+  if (endTime !== undefined) set.endTime = endTime;
+  if (Object.keys(set).length === 0) return res.status(400).json({ message: "nothing to update" });
+  const [row] = await db.update(courses).set(set).where(eq(courses.id, id)).returning();
+  if (!row) return res.status(404).json({ message: "Course not found" });
+  return res.json({ course: row });
+});
+
+router.delete("/v1/courses/:id", async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || (user.role !== "admin" && user.role !== "supervisor"))
+    return res.status(403).json({ message: "Forbidden" });
+  const id = Number(req.params.id);
+  // Unenroll students from this course first
+  await db.delete(courseEnrollments).where(eq(courseEnrollments.courseId, id));
+  // Clear students.course_id pointing to this course
+  await db.update(students).set({ courseId: null }).where(eq(students.courseId, id));
+  await db.delete(courses).where(eq(courses.id, id));
+  return res.json({ ok: true });
+});
+
+// Assign a student to a course (sets students.course_id)
+router.post("/v1/courses/:id/assign-student", async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || (user.role !== "admin" && user.role !== "supervisor"))
+    return res.status(403).json({ message: "Forbidden" });
+  const courseId = Number(req.params.id);
+  const { studentId } = req.body ?? {};
+  if (!studentId) return res.status(400).json({ message: "studentId required" });
+  await db.update(students).set({ courseId }).where(eq(students.id, Number(studentId)));
+  await db
+    .insert(courseEnrollments)
+    .values({ studentId: Number(studentId), courseId })
+    .onConflictDoNothing({ target: [courseEnrollments.studentId, courseEnrollments.courseId] });
+  return res.json({ ok: true });
+});
+
 export default router;
