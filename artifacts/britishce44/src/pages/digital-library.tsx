@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/components/providers/auth-provider'
-import { ROOMS, ROOM_META, getAllLibraryUserPermissions } from '@/lib/library-storage'
+import { ROOMS, ROOM_META, checkMyLibraryAccess } from '@/lib/library-storage'
 import { LibraryRoom } from '@/components/library/library-room'
 import { LibraryUsersPanel } from '@/components/library/library-users-panel'
 
@@ -30,16 +30,15 @@ export function DigitalLibraryPage() {
     })
   }, [search])
 
-  /* Check if current user is banned */
+  /* Check if current user is banned (server-backed) */
   const [banned, setBanned] = useState(false)
-  useState(() => {
-    if (user) {
-      getAllLibraryUserPermissions().then(perms => {
-        const myPerm = perms.find(p => p.userId === Number(user.id))
-        if (myPerm?.libraryAccess === 'ban') setBanned(true)
+  useEffect(() => {
+    if (user && !isAdmin) {
+      checkMyLibraryAccess().then(access => {
+        setBanned(access === 'ban')
       })
     }
-  })
+  }, [user, isAdmin])
 
   if (banned && !isAdmin) {
     return (

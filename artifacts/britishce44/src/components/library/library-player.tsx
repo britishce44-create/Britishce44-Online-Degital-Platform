@@ -1,29 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import { LibraryFile, FILE_TYPE_CONFIG, incrementDownloads } from '@/lib/library-storage'
 
-/* B44 watermark overlay + contact ribbon that CANNOT be removed from the display.
-   The watermark is rendered on top of the media and the ribbon at the bottom.
-   Both are part of the player component itself, not the media file. */
-
 interface Props {
   file: LibraryFile
   onClose: () => void
 }
 
 export function LibraryPlayer({ file, onClose }: Props) {
-  const [blobUrl, setBlobUrl] = useState('')
   const [showPdf, setShowPdf] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
 
   useEffect(() => {
-    const url = URL.createObjectURL(file.data)
-    setBlobUrl(url)
     incrementDownloads(file.id)
-    return () => URL.revokeObjectURL(url)
   }, [file])
 
+  // Use the server URL directly (no blob creation)
+  const mediaUrl = file.fileUrl
   const config = FILE_TYPE_CONFIG[file.type]
   const isVideo = file.type === 'mp4'
   const isImage = file.type === 'jpg'
@@ -59,8 +53,8 @@ export function LibraryPlayer({ file, onClose }: Props) {
             <span className="text-[9px] text-white/50 font-medium">{file.type.toUpperCase()}</span>
             <button onClick={() => {
               const a = document.createElement('a')
-              a.href = blobUrl
-              a.download = file.title || 'download'
+              a.href = mediaUrl
+              a.download = file.fileName || file.title || 'download'
               a.click()
             }} className="px-3 py-1 rounded-lg text-[10px] font-bold transition pointer-events-auto"
               style={{ background: 'rgba(212,160,23,0.20)', color: '#D4A017', border: '1px solid rgba(212,160,23,0.25)' }}>
@@ -80,24 +74,24 @@ export function LibraryPlayer({ file, onClose }: Props) {
             </div>
           </div>
 
-          {isVideo && blobUrl && (
-            <video ref={videoRef} src={blobUrl} controls autoPlay className="w-full h-full max-h-[70vh] object-contain bg-black" style={{ maxHeight: '70vh' }}
+          {isVideo && mediaUrl && (
+            <video ref={videoRef} src={mediaUrl} controls autoPlay className="w-full h-full max-h-[70vh] object-contain bg-black" style={{ maxHeight: '70vh' }}
               onClick={e => e.stopPropagation()} />
           )}
 
-          {isImage && blobUrl && (
+          {isImage && mediaUrl && (
             <div className="flex items-center justify-center p-4" style={{ minHeight: '50vh', background: '#0a0a1a' }}>
-              <img ref={imgRef} src={blobUrl} alt={file.title} className="max-w-full max-h-[65vh] object-contain rounded-lg shadow-xl" />
+              <img ref={imgRef} src={mediaUrl} alt={file.title} className="max-w-full max-h-[65vh] object-contain rounded-lg shadow-xl" />
             </div>
           )}
 
-          {isAudio && blobUrl && (
+          {isAudio && mediaUrl && (
             <div className="flex flex-col items-center justify-center py-16 px-8" style={{ minHeight: '30vh', background: 'linear-gradient(135deg, #0a1628, #1a1a4e)' }}>
               <div className="w-24 h-24 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-4xl mb-6 shadow-xl shadow-purple-500/20">
                 🎵
               </div>
               <p className="text-white font-bold text-lg mb-4">{file.title}</p>
-              <audio ref={audioRef} src={blobUrl} controls autoPlay className="w-full max-w-md" />
+              <audio ref={audioRef} src={mediaUrl} controls autoPlay className="w-full max-w-md" />
             </div>
           )}
 
@@ -112,14 +106,14 @@ export function LibraryPlayer({ file, onClose }: Props) {
                   style={{ background: 'linear-gradient(135deg,#2563eb,#1d4ed8)', boxShadow: '0 4px 14px rgba(37,99,235,0.25)' }}>
                   👁 Preview PDF
                 </button>
-                <a href={blobUrl} download={file.title || 'document.pdf'}
+                <a href={mediaUrl} download={file.fileName || file.title || 'document.pdf'}
                   className="px-5 py-2.5 rounded-xl text-sm font-bold transition inline-flex items-center gap-1"
                   style={{ background: 'rgba(212,160,23,0.10)', color: '#D4A017', border: '1px solid rgba(212,160,23,0.20)' }}>
                   ⬇ Download
                 </a>
               </div>
               {showPdf && (
-                <iframe src={blobUrl} className="w-full h-[60vh] mt-4 rounded-xl" style={{ background: 'white' }} />
+                <iframe src={mediaUrl} className="w-full h-[60vh] mt-4 rounded-xl" style={{ background: 'white' }} />
               )}
             </div>
           )}
@@ -129,7 +123,7 @@ export function LibraryPlayer({ file, onClose }: Props) {
               <div className="w-20 h-20 rounded-2xl bg-cyan-500/10 flex items-center justify-center text-4xl mb-4 border border-cyan-500/20">⚡</div>
               <p className="text-white font-bold text-lg mb-2">{file.title}</p>
               <p className="text-gray-400 text-xs mb-4">Flash Application · Click to open</p>
-              <a href={blobUrl} download={file.title || 'app.swf'}
+              <a href={mediaUrl} download={file.fileName || file.title || 'app.swf'}
                 className="px-5 py-2.5 rounded-xl text-sm font-bold text-white transition shadow-lg"
                 style={{ background: 'linear-gradient(135deg,#06b6d4,#0891b2)', boxShadow: '0 4px 14px rgba(6,182,212,0.25)' }}>
                 ⬇ Download Flash App
@@ -137,7 +131,7 @@ export function LibraryPlayer({ file, onClose }: Props) {
             </div>
           )}
 
-          {!blobUrl && (
+          {!mediaUrl && (
             <div className="flex items-center justify-center py-20">
               <div className="text-center">
                 <div className="w-16 h-16 rounded-full border-4 border-blue-500/20 border-t-blue-500 animate-spin mx-auto mb-4" />

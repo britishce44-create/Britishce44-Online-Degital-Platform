@@ -32,18 +32,14 @@ export function LibraryUsersPanel() {
 
   const toggleAccess = async (user: { id: number; name: string; email: string; role: string }, currentAccess: 'allow' | 'ban' | undefined) => {
     const newAccess: 'allow' | 'ban' = currentAccess === 'ban' ? 'allow' : 'ban'
-    const adminName = 'Library Admin'
-    await setUserLibraryPermission({
-      userId: user.id, userName: user.name, email: user.email, role: user.role,
-      libraryAccess: newAccess, setBy: adminName, setAt: new Date().toISOString(),
-    })
+    await setUserLibraryPermission({ userId: user.id, access: newAccess })
     load()
   }
 
   const getStatus = (userId: number): { access: 'allow' | 'ban'; setBy?: string } => {
     const perm = permissions.find(p => p.userId === userId)
     if (!perm) return { access: 'allow' }
-    return { access: perm.libraryAccess, setBy: perm.setBy }
+    return { access: perm.access, setBy: perm.setBy }
   }
 
   const filtered = apiUsers.filter(u =>
@@ -64,6 +60,7 @@ export function LibraryUsersPanel() {
             </span>
           </div>
         </div>
+        <p className="text-[10px] text-gray-500 mb-3">Permissions are stored on the server and apply to all users on all devices.</p>
         <div className="relative">
           <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500 text-sm">🔍</span>
           <input value={search} onChange={e => setSearch(e.target.value)}

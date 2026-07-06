@@ -12,6 +12,7 @@ import usersRouter from "./users";
 import contactsRouter from "./contacts";
 import classroomAssessmentRouter from "./classroom-assessment";
 import quizzesRouter from "./quizzes";
+import libraryRouter from "./library";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(usersRouter);
 router.use(contactsRouter);
 router.use(classroomAssessmentRouter);
 router.use(quizzesRouter);
+router.use(libraryRouter);
 
 export default router;

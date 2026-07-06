@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useAuth } from '@/components/providers/auth-provider'
 import {
   ROOM_META, FILE_TYPE_CONFIG, LibraryFile, RoomCard,
-  uploadLibraryFile, getRoomFiles, getRoomCards, createCard, deleteCard, deleteLibraryFile,
+  uploadLibraryFile, getRoomFiles, getRoomCards, deleteCard, deleteLibraryFile,
 } from '@/lib/library-storage'
 import { LibraryPlayer } from './library-player'
 
@@ -15,6 +16,8 @@ interface Props {
 const CARD_COLORS = ['#2563eb', '#7c3aed', '#06b6d4', '#D4A017', '#ef4444', '#10b981', '#f97316', '#ec4899', '#6366f1', '#14b8a6']
 
 export function LibraryRoom({ roomId, currentUser, onBack }: Props) {
+  const { user } = useAuth()
+  const canUpload = user?.role === 'admin' || user?.role === 'supervisor' || user?.role === 'teacher'
   const meta = ROOM_META[roomId]
   const [files, setFiles] = useState<LibraryFile[]>([])
   const [cards, setCards] = useState<RoomCard[]>([])
@@ -41,29 +44,25 @@ export function LibraryRoom({ roomId, currentUser, onBack }: Props) {
     if (!cardFile || !cardTitle.trim()) return
     setUploading(true)
     try {
-      const fileId = await uploadLibraryFile({
+      await uploadLibraryFile({
         title: cardTitle,
         roomId,
         type: cardType,
-        mimeType: cardFile.type,
-        size: cardFile.size,
-        data: cardFile,
-        uploadedBy: currentUser,
         description: cardDesc,
-      })
-      const bgColor = CARD_COLORS[cards.length % CARD_COLORS.length]
-      await createCard({
-        roomId, title: cardTitle, type: cardType, fileId, backgroundColor: bgColor,
+        uploadedBy: currentUser,
+        file: cardFile,
       })
       setCardTitle('')
       setCardDesc('')
       setCardFile(null)
       setShowCreate(false)
       load()
-    } catch {} finally { setUploading(false) }
+    } catch (e) {
+      alert((e as Error).message || 'Upload failed')
+    } finally { setUploading(false) }
   }
 
-  const handleDelete = async (cardId: string, fileId: string) => {
+  const handleDelete = async (cardId: number, fileId: number) => {
     if (!confirm('Delete this card and its file?')) return
     await deleteCard(cardId)
     await deleteLibraryFile(fileId)
@@ -96,11 +95,13 @@ export function LibraryRoom({ roomId, currentUser, onBack }: Props) {
             <span className="px-2.5 py-1 rounded-full text-[9px] font-bold" style={{ background: 'rgba(255,255,255,0.10)', color: '#fff' }}>
               {cards.length} items
             </span>
-            <button onClick={() => setShowCreate(true)}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-white transition shadow-lg"
-              style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.20)' }}>
-              ✚ Add Card
-            </button>
+            {canUpload && (
+              <button onClick={() => setShowCreate(true)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white transition shadow-lg"
+                style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.20)' }}>
+                ✚ Add Card
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -205,11 +206,13 @@ export function LibraryRoom({ roomId, currentUser, onBack }: Props) {
                   style={{ background: 'rgba(0,0,0,0.50)', color: '#fff' }}>
                   👁
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); handleDelete(card.id, card.fileId) }}
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs"
-                  style={{ background: 'rgba(239,68,68,0.50)', color: '#fff' }}>
-                  ✕
-                </button>
+                {canUpload && (
+                  <button onClick={(e) => { e.stopPropagation(); handleDelete(card.id, card.fileId) }}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs"
+                    style={{ background: 'rgba(239,68,68,0.50)', color: '#fff' }}>
+                    ✕
+                  </button>
+                )}
               </div>
               {/* File type badge */}
               <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[8px] font-bold"
