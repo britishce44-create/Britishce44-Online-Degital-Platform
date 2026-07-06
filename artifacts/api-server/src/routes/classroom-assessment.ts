@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { eq, and, inArray } from "drizzle-orm";
-import { db, appUsers, courses, teachers, students, parents, criteria, assessmentSheets, assessmentScores, reports, attendanceSheets, attendanceRows } from "@workspace/db";
+import { db, appUsers, courses, teachers, students, parents, criteria, assessmentSheets, assessmentScores, reports, attendanceSheets, attendanceRows, classrooms, courseEnrollments } from "@workspace/db";
 import { generateReportsForSheet } from "../lib/reports";
 import { logger } from "../lib/logger";
 
@@ -421,6 +421,169 @@ router.post("/v1/classroom-assessment/reports/:id/generate-pdf", async (req, res
   };
 
   return res.json(pdfData);
+});
+
+/* ── Student schedule: GET /v1/classroom-assessment/schedule ────────────── */
+// Returns the authenticated student's weekly classes with room/teacher/time.
+// Powers the Student App schedule + live-class join.
+router.get("/v1/classroom-assessment/schedule", async (req, res) => {
+  const user = getReqUser(req);
+  if (!user) return res.status(403).json({ message: "Forbidden" });
+
+  // Resolve the student record from the linked app_user
+  let studentRecord: typeof students.$inferSelect | null = null;
+  if (user.role === "student") {
+    const [au] = await db.select().from(appUsers).where(eq(appUsers.email, user.email)).limit(1);
+    if (au?.studentId) {
+      const [s] = await db.select().from(students).where(eq(students.id, au.studentId)).limit(1);
+      studentRecord = s ?? null;
+    }
+  } else if (user.role === "admin" || user.role === "supervisor") {
+    // Admins see all classes (optionally filtered by studentId query param)
+    const sid = req.query.studentId ? Number(req.query.studentId) : null;
+    if (sid) {
+      const [s] = await db.select().from(students).where(eq(students.id, sid)).limit(1);
+      studentRecord = s ?? null;
+    }
+  }
+  if (!studentRecord) return res.json({ classes: [] });
+
+  // Gather courses: primary via students.course_id + any via enrollments
+  const courseIds = new Set<number>();
+  if (studentRecord.courseId) courseIds.add(studentRecord.courseId);
+  const enrolls = await db.select().from(courseEnrollments).where(eq(courseEnrollments.studentId, studentRecord.id));
+  enrolls.forEach((e) => courseIds.add(e.courseId));
+
+  if (courseIds.size === 0) return res.json({ classes: [] });
+
+  const courseList = await db.select().from(courses).where(inArray(courses.id, [...courseIds]));
+  const classes: unknown[] = [];
+  for (const c of courseList) {
+    let teacherName: string | null = null;
+    if (c.teacherId) {
+      const [t] = await db.select().from(teachers).where(eq(teachers.id, c.teacherId)).limit(1);
+      teacherName = t?.name ?? null;
+    }
+    // Expand weekdays into per-day class events for the schedule UI
+    const weekdays = c.teachingWeekdays ?? [];
+    for (const wd of weekdays) {
+      classes.push({
+        id: c.id * 10 + wd,
+        courseId: c.id,
+        name: c.name,
+        teacher: teacherName,
+        room: c.room ?? `Room ${c.id}`,
+        date: nextDateForWeekday(wd),
+        startTime: c.startTime ?? "08:00",
+        endTime: c.endTime ?? "09:30",
+        weekday: wd,
+        level: c.level ?? studentRecord.level ?? null,
+      });
+    }
+  }
+  return res.json({ classes });
+});
+
+function nextDateForWeekday(wd: number): string {
+  const now = new Date();
+  const cur = now.getDay();
+  let diff = (wd - cur + 7) % 7;
+  if (diff === 0) diff = 0;
+  const d = new Date(now.getTime() + diff * 86400000);
+  return d.toISOString().split("T")[0];
+}
+
+/* ── Classrooms CRUD: real DB-backed rooms (replaces synthetic buildRooms) ─ */
+
+router.get("/v1/classrooms", async (req, res) => {
+  const user = getReqUser(req);
+  if (!user) return res.status(403).json({ message: "Forbidden" });
+
+  const rooms = await db.select().from(classrooms).orderBy(classrooms.id);
+  const out = [];
+  for (const r of rooms) {
+    const [c] = r.courseId ? await db.select().from(courses).where(eq(courses.id, r.courseId)).limit(1) : [null];
+    let teacherName: string | null = null;
+    let level: string | null = null;
+    let studentCount = 0;
+    if (c) {
+      level = c.level ?? null;
+      if (c.teacherId) {
+        const [t] = await db.select().from(teachers).where(eq(teachers.id, c.teacherId)).limit(1);
+        teacherName = t?.name ?? null;
+      }
+      studentCount = (await db.select().from(students).where(eq(students.courseId, c.id))).length;
+    }
+    out.push({
+      ...r,
+      courseName: c?.name ?? null,
+      teacherName,
+      level,
+      studentCount,
+      startTime: c?.startTime ?? null,
+      endTime: c?.endTime ?? null,
+    });
+  }
+  return res.json({ classrooms: out });
+});
+
+router.post("/v1/classrooms", async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || (user.role !== "admin" && user.role !== "supervisor"))
+    return res.status(403).json({ message: "Forbidden" });
+  const { courseId, roomId, label, status } = req.body ?? {};
+  if (!courseId) return res.status(400).json({ message: "courseId required" });
+  const [row] = await db
+    .insert(classrooms)
+    .values({
+      courseId: Number(courseId),
+      roomId: roomId ? Number(roomId) : null,
+      label: label ?? null,
+      status: status ?? "scheduled",
+      active: true,
+    })
+    .returning();
+  return res.json({ classroom: row });
+});
+
+router.patch("/v1/classrooms/:id", async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || (user.role !== "admin" && user.role !== "supervisor"))
+    return res.status(403).json({ message: "Forbidden" });
+  const id = Number(req.params.id);
+  const { courseId, roomId, label, status, active } = req.body ?? {};
+  const set: Record<string, unknown> = {};
+  if (courseId !== undefined) set.courseId = Number(courseId);
+  if (roomId !== undefined) set.roomId = Number(roomId);
+  if (label !== undefined) set.label = label;
+  if (status !== undefined) set.status = status;
+  if (active !== undefined) set.active = !!active;
+  if (Object.keys(set).length === 0) return res.status(400).json({ message: "nothing to update" });
+  const [row] = await db.update(classrooms).set(set).where(eq(classrooms.id, id)).returning();
+  return res.json({ classroom: row });
+});
+
+router.delete("/v1/classrooms/:id", async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || (user.role !== "admin" && user.role !== "supervisor"))
+    return res.status(403).json({ message: "Forbidden" });
+  const id = Number(req.params.id);
+  await db.delete(classrooms).where(eq(classrooms.id, id));
+  return res.json({ ok: true });
+});
+
+// Enroll a student in a course (many-to-many)
+router.post("/v1/classroom-assessment/enroll", async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || (user.role !== "admin" && user.role !== "supervisor"))
+    return res.status(403).json({ message: "Forbidden" });
+  const { studentId, courseId } = req.body ?? {};
+  if (!studentId || !courseId) return res.status(400).json({ message: "studentId and courseId required" });
+  await db
+    .insert(courseEnrollments)
+    .values({ studentId: Number(studentId), courseId: Number(courseId) })
+    .onConflictDoNothing({ target: [courseEnrollments.studentId, courseEnrollments.courseId] });
+  return res.json({ ok: true });
 });
 
 export default router;

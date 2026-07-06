@@ -153,6 +153,16 @@ export interface EvalCriterion {
   labelAr: string | null
   kind: EvalCritKind
   maxScore: number
+  weight: string
+  isKpi: boolean
+  feedback: {
+    weak: { en: { reason: string; feedback: string; rec: string }; ar: { reason: string; feedback: string; rec: string } }
+    developing: { en: { reason: string; feedback: string; rec: string }; ar: { reason: string; feedback: string; rec: string } }
+    strong: { en: { reason: string; feedback: string; rec: string }; ar: { reason: string; feedback: string; rec: string } }
+    video: string
+    website: string
+  } | null
+  tierBoundaries: { weak: [number, number]; developing: [number, number]; strong: [number, number] } | null
   orderIndex: number
   active: boolean
 }
@@ -187,6 +197,17 @@ export interface EvalTeacherRef {
   id: number
   name: string
   email: string | null
+  courses?: {
+    id: number
+    name: string
+    level: string | null
+    room: string | null
+    startTime: string | null
+    endTime: string | null
+    teachingWeekdays: number[]
+    termLabel: string
+    studentCount: number
+  }[]
 }
 
 export type EvalScoreCell = { score: number | null; note: string | null }
@@ -199,6 +220,73 @@ export interface EvalGrid {
   days: number[]
   scores: Record<number, Record<number, Record<number, EvalScoreCell>>>
   dayMeta: Record<number, Record<number, number | null>>
+}
+
+/* ── Eval analytics + training plans ── */
+
+export interface EvalAnalyticsTeacher {
+  teacherId: number
+  teacherName: string
+  weightedAvg: number
+  overallPercent: number
+  level: string
+  perCriterion: {
+    criterionId: number
+    label: string
+    labelAr: string | null
+    score: number
+    max: number
+    percent: number
+    tier: 'weak' | 'developing' | 'strong'
+    weight: number
+    isKpi: boolean
+  }[]
+}
+
+export interface EvalCriterionAverage {
+  criterionId: number
+  label: string
+  labelAr: string | null
+  avg: number
+  max: number
+  percent: number
+  isKpi: boolean
+}
+
+export interface EvalAnalytics {
+  sheet: EvalSheet
+  template: EvalTemplate
+  teachersAnalytics: EvalAnalyticsTeacher[]
+  criterionAverages: EvalCriterionAverage[]
+}
+
+export interface EvalTrainingPlan {
+  id: number
+  sheetId: number | null
+  teacherId: number
+  criterionId: number | null
+  action: string
+  status: 'pending' | 'in-progress' | 'done'
+  dueDate: string | null
+  createdAt: string
+}
+
+/* ── Classrooms (real DB-backed) ── */
+
+export interface ClassroomRoom {
+  id: number
+  courseId: number
+  roomId: number | null
+  label: string | null
+  status: 'live' | 'scheduled' | 'empty' | 'locked'
+  active: boolean
+  createdAt: string
+  courseName: string | null
+  teacherName: string | null
+  level: string | null
+  studentCount: number
+  startTime: string | null
+  endTime: string | null
 }
 
 export interface Task {

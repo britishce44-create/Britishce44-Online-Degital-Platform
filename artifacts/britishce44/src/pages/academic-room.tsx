@@ -430,8 +430,13 @@ export function AcademicRoomPage() {
       {/* IN-CLASS ASSESSMENT MANAGEMENT */}
       {tab==='assessment'&&<AssessmentAdmin/>}
 
-      {/* TEACHER PERFORMANCE EVALUATION MANAGEMENT */}
-      {tab==='teachereval'&&<EvalAdmin/>}
+      {/* TEACHER PERFORMANCE EVALUATION MANAGEMENT — moved to AI Teacher Eval Admin tab */}
+      {tab==='teachereval'&&(
+        <div style={{padding:32,textAlign:'center',color:'#64748b'}}>
+          <p style={{fontSize:16,marginBottom:8}}>{lang==='ar'?'تم نقل إدارة تقييم المعلمين إلى تبويب "الإدارة" في صفحة تقييم المعلم بالذكاء.':'Teacher Evaluation management has moved to the "Admin" tab in the AI Teacher Eval page.'}</p>
+          <p style={{fontSize:14}}>{lang==='ar'?'استخدم قائمة التنقل "تقييم المعلم بالذكاء" للوصول إليها.':'Use the "AI Teacher Eval" nav item to access it.'}</p>
+        </div>
+      )}
 
       {/* OVERVIEW */}
       {tab==='overview'&&(

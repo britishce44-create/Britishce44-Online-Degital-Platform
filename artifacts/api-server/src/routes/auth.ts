@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
-import { db, appUsers } from "@workspace/db";
+import { db, appUsers, students, courses, teachers } from "@workspace/db";
 import { createSession } from "../lib/auth";
 
 const router: IRouter = Router();
@@ -78,6 +78,40 @@ router.post("/v1/auth/login", async (req, res) => {
       // Update last seen
       await db.update(appUsers).set({ lastSeen: now.toLocaleString() }).where(eq(appUsers.id, dbUser.id));
 
+      // Enrich the response with role-specific context so the Student App
+      // and Teacher Eval can show real room/teacher/level/time data.
+      let context: Record<string, unknown> = {};
+      if (dbUser.role === "student" && dbUser.studentId) {
+        const [s] = await db.select().from(students).where(eq(students.id, dbUser.studentId)).limit(1);
+        if (s) {
+          let courseData: typeof courses.$inferSelect | null = null;
+          let teacherName: string | null = null;
+          if (s.courseId) {
+            const [c] = await db.select().from(courses).where(eq(courses.id, s.courseId)).limit(1);
+            courseData = c ?? null;
+            if (c?.teacherId) {
+              const [t] = await db.select().from(teachers).where(eq(teachers.id, c.teacherId)).limit(1);
+              teacherName = t?.name ?? null;
+            }
+          }
+          context = {
+            classroomNum: courseData?.room ? 0 : (s.courseId ?? 0),
+            room: courseData?.room ?? null,
+            teacher: teacherName,
+            level: s.level ?? courseData?.level ?? null,
+            startTime: courseData?.startTime ?? null,
+            endTime: courseData?.endTime ?? null,
+            courseId: s.courseId ?? null,
+          };
+        }
+      } else if (dbUser.role === "teacher" && dbUser.teacherId) {
+        const teacherCourses = await db
+          .select({ id: courses.id, name: courses.name, level: courses.level, room: courses.room, startTime: courses.startTime, endTime: courses.endTime })
+          .from(courses)
+          .where(eq(courses.teacherId, dbUser.teacherId));
+        context = { courses: teacherCourses };
+      }
+
       return res.json({
         accessToken,
         user: {
@@ -86,6 +120,10 @@ router.post("/v1/auth/login", async (req, res) => {
           firstName,
           lastName,
           role: dbUser.role,
+          teacherId: dbUser.teacherId ?? null,
+          studentId: dbUser.studentId ?? null,
+          parentId: dbUser.parentId ?? null,
+          ...context,
         },
         permissions: dbUser.permissions,
         dashboardConfig: dbUser.dashboardConfig,

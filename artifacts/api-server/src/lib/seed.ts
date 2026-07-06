@@ -15,6 +15,7 @@ import {
 } from "@workspace/db";
 import { nthTeachingDayISO } from "./teaching-days";
 import { logger } from "./logger";
+import { FEEDBACK_DB } from "./eval-feedback-data";
 
 const CRITERIA = [
   { key: "speaking", labelEn: "Speaking", labelAr: "المحادثة" },
@@ -249,6 +250,10 @@ type CritSeed = {
   labelEn: string;
   labelAr: string;
   kind?: "score" | "text";
+  maxScore?: number;
+  weight?: number;
+  isKpi?: boolean;
+  feedbackId?: number;
 };
 
 // Table 1 — "columns" layout: scored criteria + two free-text columns.
@@ -276,6 +281,28 @@ const WEEKLY_CRITERIA: CritSeed[] = [
   { key: "goals", labelEn: "Teacher knows and states the lesson goals to the students", labelAr: "يعرف المعلم أهداف الدرس ويوضحها للطلاب" },
 ];
 
+// Table 3 — "British Center" weighted 15-criteria layout (max scores
+// 35/25/25/25/25/20/15/15/15/10/5/5/5/5/5 = 235). Each criterion carries a
+// weight, a KPI flag, and the full bilingual 3-tier feedback DB keyed by
+// feedbackId (maps to FEEDBACK_DB).
+const BRITISH_CRITERIA: CritSeed[] = [
+  { key: "strategy", labelEn: "Strategy", labelAr: "الاستراتيجية", maxScore: 35, weight: 3.5, isKpi: true, feedbackId: 1 },
+  { key: "lesson_organisation", labelEn: "Lesson Organisation", labelAr: "تنظيم الدرس", maxScore: 25, weight: 2.5, isKpi: true, feedbackId: 2 },
+  { key: "tasks_activities", labelEn: "Tasks and Activities", labelAr: "المهام والأنشطة", maxScore: 25, weight: 2.5, isKpi: true, feedbackId: 3 },
+  { key: "classroom_language", labelEn: "Classroom Language", labelAr: "لغة الفصل", maxScore: 25, weight: 2.5, isKpi: true, feedbackId: 4 },
+  { key: "classroom_management", labelEn: "Classroom Management", labelAr: "إدارة الفصل", maxScore: 25, weight: 2.5, isKpi: true, feedbackId: 5 },
+  { key: "atmosphere", labelEn: "Atmosphere", labelAr: "الجو العام", maxScore: 20, weight: 2, isKpi: false, feedbackId: 6 },
+  { key: "tools_engagement", labelEn: "Tools and Engagement", labelAr: "الأدوات والتفاعل", maxScore: 15, weight: 1.5, isKpi: false, feedbackId: 7 },
+  { key: "whiteboard_use", labelEn: "Whiteboard Use", labelAr: "استخدام السبورة", maxScore: 15, weight: 1.5, isKpi: false, feedbackId: 8 },
+  { key: "appearance", labelEn: "Appearance", labelAr: "المظهر", maxScore: 15, weight: 1.5, isKpi: false, feedbackId: 9 },
+  { key: "language_accuracy", labelEn: "Language Accuracy", labelAr: "دقة اللغة", maxScore: 10, weight: 1, isKpi: true, feedbackId: 10 },
+  { key: "stating_objectives", labelEn: "Stating Objectives", labelAr: "تحديد الأهداف", maxScore: 5, weight: 0.5, isKpi: false, feedbackId: 11 },
+  { key: "students_involvement", labelEn: "Students' Involvement", labelAr: "مشاركة الطلاب", maxScore: 5, weight: 0.5, isKpi: false, feedbackId: 12 },
+  { key: "students_english", labelEn: "Students' Use of English", labelAr: "استخدام الطلاب للغة الإنجليزية", maxScore: 5, weight: 0.5, isKpi: false, feedbackId: 13 },
+  { key: "stt_ttt", labelEn: "STT vs TTT", labelAr: "وقت تحدث الطلاب مقابل المعلم", maxScore: 5, weight: 0.5, isKpi: false, feedbackId: 14 },
+  { key: "temper_encouragement", labelEn: "Teacher's Temper & Encouragement", labelAr: "طبع المعلم وتشجيعه", maxScore: 5, weight: 0.5, isKpi: false, feedbackId: 15 },
+];
+
 const EVAL_TEMPLATES: {
   key: string;
   name: string;
@@ -286,6 +313,7 @@ const EVAL_TEMPLATES: {
 }[] = [
   { key: "teacher_eval_columns", name: "Teachers' Performance Evaluation — Page 1", nameAr: "تقييم أداء المعلمين — صفحة ١", layout: "columns", orderIndex: 0, criteria: COLUMN_CRITERIA },
   { key: "teacher_eval_weekly", name: "Teachers Performance Evaluation Form", nameAr: "نموذج تقييم أداء المعلمين", layout: "weekly", orderIndex: 1, criteria: WEEKLY_CRITERIA },
+  { key: "teacher_eval_british", name: "British Center Teacher Evaluation (15 Criteria)", nameAr: "تقييم المعلم البريطاني (١٥ معيارًا)", layout: "columns", orderIndex: 2, criteria: BRITISH_CRITERIA },
 ];
 
 // Ensures the evaluated teachers, both templates, their criteria, and a current
@@ -364,16 +392,31 @@ export async function seedEval(): Promise<void> {
     const toInsert = tpl.criteria
       .map((c, i) => ({ c, i }))
       .filter(({ c }) => !haveKeys.has(c.key))
-      .map(({ c, i }) => ({
-        templateId: tplRow.id,
-        key: c.key,
-        labelEn: c.labelEn,
-        labelAr: c.labelAr,
-        kind: c.kind ?? "score",
-        maxScore: 5,
-        orderIndex: i,
-        active: true,
-      }));
+      .map(({ c, i }) => {
+        const fb = c.feedbackId ? FEEDBACK_DB[c.feedbackId] : undefined;
+        return {
+          templateId: tplRow.id,
+          key: c.key,
+          labelEn: c.labelEn,
+          labelAr: c.labelAr,
+          kind: c.kind ?? "score",
+          maxScore: c.maxScore ?? 5,
+          weight: String(c.weight ?? 1),
+          isKpi: c.isKpi ?? false,
+          feedback: fb
+            ? {
+                weak: fb.weak,
+                developing: fb.developing,
+                strong: fb.strong,
+                video: fb.video,
+                website: fb.website,
+              }
+            : null,
+          tierBoundaries: { weak: [0, 0.49], developing: [0.5, 0.79], strong: [0.8, 1] },
+          orderIndex: i,
+          active: true,
+        };
+      });
     if (toInsert.length) await db.insert(evalCriteria).values(toInsert);
 
     const week = tpl.layout === "weekly" ? "Week 1" : "";

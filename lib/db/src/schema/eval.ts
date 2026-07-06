@@ -3,8 +3,10 @@ import {
   serial,
   text,
   integer,
+  numeric,
   timestamp,
   boolean,
+  jsonb,
   unique,
 } from "drizzle-orm/pg-core";
 
@@ -34,6 +36,13 @@ export const evalTemplates = pgTable("eval_templates", {
 });
 
 // Columns (layout 'columns') or evaluation points (layout 'weekly').
+// New additive fields (safe defaults, non-breaking):
+//   weight         : numeric weight for weighted-average scoring (default 1)
+//   isKpi          : marks the criterion as a "focused KPI" for the dashboard
+//   feedback       : jsonb holding the 3-tier (Weak/Developing/Strong) bilingual
+//                    feedback DB {reason,feedback,rec}{_en,_ar} + video_url + website_url
+//   tierBoundaries : jsonb fractions of max delimiting Weak/Developing/Strong,
+//                    default {"weak":[0,0.49],"developing":[0.5,0.79],"strong":[0.8,1]}
 export const evalCriteria = pgTable("eval_criteria", {
   id: serial("id").primaryKey(),
   templateId: integer("template_id").notNull(),
@@ -42,6 +51,10 @@ export const evalCriteria = pgTable("eval_criteria", {
   labelAr: text("label_ar"),
   kind: text("kind").$type<"score" | "text">().notNull().default("score"),
   maxScore: integer("max_score").notNull().default(5),
+  weight: numeric("weight").notNull().default("1"),
+  isKpi: boolean("is_kpi").notNull().default(false),
+  feedback: jsonb("feedback"),
+  tierBoundaries: jsonb("tier_boundaries"),
   orderIndex: integer("order_index").notNull().default(0),
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -117,8 +130,27 @@ export const evalDayMeta = pgTable(
   ],
 );
 
+// Per-teacher training plans auto-generated from recurring weak criteria.
+export const evalTrainingPlans = pgTable(
+  "eval_training_plans",
+  {
+    id: serial("id").primaryKey(),
+    sheetId: integer("sheet_id"),
+    teacherId: integer("teacher_id").notNull(),
+    criterionId: integer("criterion_id"),
+    action: text("action").notNull(),
+    status: text("status")
+      .$type<"pending" | "in-progress" | "done">()
+      .notNull()
+      .default("pending"),
+    dueDate: text("due_date"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+);
+
 export type EvalTemplate = typeof evalTemplates.$inferSelect;
 export type EvalCriterion = typeof evalCriteria.$inferSelect;
 export type EvalSheet = typeof evalSheets.$inferSelect;
 export type EvalScore = typeof evalScores.$inferSelect;
 export type EvalDayMeta = typeof evalDayMeta.$inferSelect;
+export type EvalTrainingPlan = typeof evalTrainingPlans.$inferSelect;

@@ -12,8 +12,8 @@ export interface AppStudentData {
 }
 
 export interface AppClassEvent {
-  id: string; name: string; teacher: string; room: number
-  startTime: string; endTime: string; date: string
+  id: string | number; name: string; teacher: string; room: string | number
+  startTime: string; endTime: string; date: string; weekday?: number; level?: string | null; courseId?: number
 }
 
 interface AppNotification {

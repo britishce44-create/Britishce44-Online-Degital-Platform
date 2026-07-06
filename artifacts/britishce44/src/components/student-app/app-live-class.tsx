@@ -1,10 +1,45 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useAppState } from './app-provider'
 
 export function AppLiveClass() {
-  const { student, online } = useAppState()
+  const { student, classes, online } = useAppState()
   const [micOn, setMicOn] = useState(false)
   const [camOn, setCamOn] = useState(false)
+
+  // Find the currently-active class (today, within start–end time)
+  const activeClass = useMemo(() => {
+    const now = new Date()
+    const today = now.toISOString().split('T')[0]
+    const nowMin = now.getHours() * 60 + now.getMinutes()
+    return classes.find(c => {
+      if (c.date !== today) return false
+      const [sh, sm] = c.startTime.split(':').map(Number)
+      const [eh, em] = c.endTime.split(':').map(Number)
+      const start = sh * 60 + (sm || 0)
+      const end = eh * 60 + (em || 0)
+      return nowMin >= start && nowMin <= end
+    })
+  }, [classes])
+
+  // The room to join: active class room (numeric), or the student's assigned room
+  const joinRoom = (() => {
+    if (activeClass) {
+      // Prefer courseId as the numeric room ID for the join URL
+      if (activeClass.courseId) return activeClass.courseId
+      const r = Number(activeClass.room)
+      if (!isNaN(r) && r > 0) return r
+    }
+    return student?.classroomNum || 0
+  })()
+
+  const joinLiveClass = () => {
+    if (!joinRoom) return
+    // Open the full classroom (with WebRTC) in a new tab.
+    // The join URL uses ?room=N which routes through the main app's
+    // ClassroomRoom → WebRTCProvider → joinClassroom(roomId).
+    const url = `${window.location.origin}/?room=${joinRoom}`
+    window.open(url, '_blank')
+  }
 
   if (!online) {
     return (
@@ -23,14 +58,24 @@ export function AppLiveClass() {
 
   return (
     <div className="flex-1 flex flex-col pb-20">
-      {/* Video area (placeholder) */}
+      {/* Video area */}
       <div className="flex-1 relative m-4 rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(145deg, #1e1b4b, #312e81)' }}>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <div className="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-4xl text-white mb-4 shadow-xl">
             {student?.name?.charAt(0) || '?'}
           </div>
           <p className="text-white font-bold text-lg">{student?.name || 'Student'}</p>
-          {student?.classroomNum && <p className="text-indigo-300 text-sm mt-1">Room {student.classroomNum}</p>}
+          {activeClass ? (
+            <div className="text-center mt-2">
+              <p className="text-indigo-300 text-sm">{activeClass.name}</p>
+              <p className="text-indigo-300/70 text-xs">{activeClass.teacher} · Room {activeClass.room}</p>
+              <p className="text-indigo-300/50 text-xs">{activeClass.startTime}–{activeClass.endTime}</p>
+            </div>
+          ) : student?.classroomNum ? (
+            <p className="text-indigo-300 text-sm mt-1">Room {student.classroomNum}</p>
+          ) : (
+            <p className="text-gray-400 text-xs mt-1">No active class right now</p>
+          )}
           <p className="text-gray-400 text-xs mt-4">
             {camOn ? '📷 Camera on' : '📷 Camera off'}
             {' · '}
@@ -45,6 +90,18 @@ export function AppLiveClass() {
           </div>
         )}
       </div>
+
+      {/* Join button — opens the full WebRTC classroom */}
+      {joinRoom > 0 && (
+        <div className="px-4 mb-2">
+          <button
+            onClick={joinLiveClass}
+            className="w-full py-3 rounded-xl text-sm font-bold text-white transition active:scale-95"
+            style={{ background: 'linear-gradient(135deg,#3FBAEB,#2563eb)', boxShadow: '0 4px 16px rgba(63,186,235,0.3)' }}>
+            {activeClass ? '🔴 Join Live Class →' : 'Enter Classroom →'}
+          </button>
+        </div>
+      )}
 
       {/* Controls */}
       <div className="flex items-center justify-center gap-4 px-4 py-3">
@@ -66,8 +123,9 @@ export function AppLiveClass() {
       </div>
 
       <p className="text-center text-[10px] text-gray-500 px-4 pb-2">
-        Full WebRTC classroom integration connects when you join a scheduled class.
-        Microphone, camera, screen share, and chat are available in the full classroom window.
+        {activeClass
+          ? 'Your class is live now. Tap "Join Live Class" to enter the full classroom with video, audio, and chat.'
+          : 'Join a scheduled class from the Schedule tab when it\'s time. The full classroom opens with video, audio, and chat.'}
       </p>
     </div>
   )

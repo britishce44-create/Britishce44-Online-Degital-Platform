@@ -19,12 +19,15 @@ function StudentAppInner() {
 
   useEffect(() => {
     registerSW()
-    /* Check URL for prefill */
+    /* Check URL for prefill + room deep-link */
     const params = new URLSearchParams(window.location.search)
     const token = params.get('token') || localStorage.getItem('b44_app_token')
     const name = params.get('name') || ''
+    const room = params.get('room')
     if (token) localStorage.setItem('b44_app_token', token)
     setPrefill(name ? { name, token: token || '' } : null)
+    // If a room deep-link is present, jump to the live class tab
+    if (room) setPage('live')
     setLoading(false)
   }, [])
 
