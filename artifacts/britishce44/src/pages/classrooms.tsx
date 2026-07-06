@@ -102,6 +102,20 @@ export function ClassroomsPage({ onEnterClassroom }: { onEnterClassroom: (id: nu
   const [page, setPage] = useState(0)
   const [showCreate, setShowCreate] = useState(false)
   const [newRoom, setNewRoom] = useState({ courseId: 0, roomId: 0, label: '', status: 'scheduled' as RoomStatus })
+  const [showNewCourse, setShowNewCourse] = useState(false)
+  const [newCourse, setNewCourse] = useState({
+    name: '', level: '', room: '', startTime: '08:00', endTime: '09:30',
+    termLabel: 'Term 1', termStartDate: new Date().toISOString().split('T')[0],
+    teachingWeekdays: [0, 1, 2, 3, 4] as number[], teacherId: 0,
+  })
+  const [teachersList, setTeachersList] = useState<{ id: number; name: string }[]>([])
+
+  const loadTeachers = useCallback(async () => {
+    try {
+      const r = await apiGet<{ teachers: { id: number; name: string }[] }>('/classroom-assessment/teachers')
+      setTeachersList(r.teachers)
+    } catch { /* ignore */ }
+  }, [])
 
   const loadRooms = useCallback(async () => {
     try {
@@ -113,12 +127,12 @@ export function ClassroomsPage({ onEnterClassroom }: { onEnterClassroom: (id: nu
 
   const loadCourses = useCallback(async () => {
     try {
-      const r = await apiGet<{ courses: Course[] }>('/classroom-assessment/teachers/0/courses')
+      const r = await apiGet<{ courses: Course[] }>('/courses')
       setCourses(r.courses)
     } catch { /* ignore */ }
   }, [])
 
-  useEffect(() => { loadRooms(); loadCourses() }, [loadRooms, loadCourses])
+  useEffect(() => { loadRooms(); loadCourses(); loadTeachers() }, [loadRooms, loadCourses, loadTeachers])
 
   const filtered = useMemo(() => {
     return rooms.filter(r => {
@@ -144,7 +158,7 @@ export function ClassroomsPage({ onEnterClassroom }: { onEnterClassroom: (id: nu
   }), [rooms])
 
   const createRoom = async () => {
-    if (!newRoom.courseId) { toast.error('Select a course'); return }
+    if (!newRoom.courseId) { toast.error('Select a course or create one'); return }
     try {
       await apiPost('/classrooms', {
         courseId: newRoom.courseId,
@@ -152,13 +166,42 @@ export function ClassroomsPage({ onEnterClassroom }: { onEnterClassroom: (id: nu
         label: newRoom.label || undefined,
         status: newRoom.status,
       })
-      toast.success('Room created')
+      toast.success('Classroom created')
       setShowCreate(false)
       setNewRoom({ courseId: 0, roomId: 0, label: '', status: 'scheduled' })
       await loadRooms()
     } catch (e: any) {
-      toast.error(e.message || 'Failed to create room')
+      toast.error(e.message || 'Failed to create classroom')
     }
+  }
+
+  const createCourseInline = async () => {
+    if (!newCourse.name.trim()) { toast.error('Course name is required'); return }
+    try {
+      const r = await apiPost<{ course: Course }>('/courses', {
+        teacherId: newCourse.teacherId || undefined,
+        name: newCourse.name.trim(),
+        level: newCourse.level || undefined,
+        termLabel: newCourse.termLabel,
+        termStartDate: newCourse.termStartDate,
+        teachingWeekdays: newCourse.teachingWeekdays,
+        room: newCourse.room || undefined,
+        startTime: newCourse.startTime || undefined,
+        endTime: newCourse.endTime || undefined,
+      })
+      toast.success('Course created')
+      // Auto-select the new course
+      setNewRoom({ ...newRoom, courseId: r.course.id, label: newCourse.name, roomId: newRoom.roomId })
+      setShowNewCourse(false)
+      setNewCourse({ name: '', level: '', room: '', startTime: '08:00', endTime: '09:30', termLabel: 'Term 1', termStartDate: new Date().toISOString().split('T')[0], teachingWeekdays: [0,1,2,3,4], teacherId: 0 })
+      await loadCourses()
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to create course')
+    }
+  }
+
+  const toggleWeekday = (n: number) => {
+    setNewCourse(p => ({ ...p, teachingWeekdays: p.teachingWeekdays.includes(n) ? p.teachingWeekdays.filter(x => x !== n) : [...p.teachingWeekdays, n].sort() }))
   }
 
   const deleteRoom = async (id: number) => {
@@ -241,45 +284,121 @@ export function ClassroomsPage({ onEnterClassroom }: { onEnterClassroom: (id: nu
         </div>
       )}
 
-      {/* Create room modal */}
+      {/* Create classroom modal */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setShowCreate(false)}>
-          <div className="rounded-2xl p-6 w-full max-w-md" style={{ background: '#0b1640', border: '1px solid rgba(63,186,235,0.2)' }} onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-white mb-4">Assign Classroom</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-white/60 text-xs block mb-1">Course</label>
-                <select value={newRoom.courseId} onChange={(e) => setNewRoom({ ...newRoom, courseId: Number(e.target.value) })}
-                  className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none">
-                  <option value={0} className="bg-slate-800">— Select a course —</option>
-                  {courses.map(c => <option key={c.id} value={c.id} className="bg-slate-800">{c.name} {c.level ? `(${c.level})` : ''}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-white/60 text-xs block mb-1">Room Number (for join link)</label>
-                <input type="number" value={newRoom.roomId || ''} onChange={(e) => setNewRoom({ ...newRoom, roomId: Number(e.target.value) })}
-                  placeholder="e.g. 101" className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none" />
-              </div>
-              <div>
-                <label className="text-white/60 text-xs block mb-1">Label (optional)</label>
-                <input value={newRoom.label} onChange={(e) => setNewRoom({ ...newRoom, label: e.target.value })}
-                  placeholder="e.g. G1 · English" className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none" />
-              </div>
-              <div>
-                <label className="text-white/60 text-xs block mb-1">Status</label>
-                <select value={newRoom.status} onChange={(e) => setNewRoom({ ...newRoom, status: e.target.value as RoomStatus })}
-                  className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none">
-                  <option value="scheduled" className="bg-slate-800">Scheduled</option>
-                  <option value="live" className="bg-slate-800">Live</option>
-                  <option value="empty" className="bg-slate-800">Empty</option>
-                  <option value="locked" className="bg-slate-800">Locked</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex gap-3 mt-5 justify-end">
-              <button onClick={() => setShowCreate(false)} className="px-4 py-2 rounded-lg text-sm text-white/60 bg-white/5">Cancel</button>
-              <button onClick={createRoom} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'linear-gradient(135deg,#3FBAEB,#2563eb)' }}>Create</button>
-            </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => { setShowCreate(false); setShowNewCourse(false) }}>
+          <div className="rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" style={{ background: '#0b1640', border: '1px solid rgba(63,186,235,0.2)' }} onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-white mb-1">Assign Classroom</h3>
+            <p className="text-white/40 text-xs mb-4">Create a classroom from an existing course, or add a new course manually.</p>
+
+            {!showNewCourse ? (
+              <>
+                {/* Pick existing course */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-white/60 text-xs block mb-1">Course</label>
+                    {courses.length === 0 ? (
+                      <div className="px-3 py-4 rounded-lg text-sm text-white/50 bg-white/5 border border-white/10 text-center">
+                        No courses yet. <button onClick={() => setShowNewCourse(true)} className="text-sky-400 underline font-semibold">Add a course manually →</button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <select value={newRoom.courseId} onChange={(e) => setNewRoom({ ...newRoom, courseId: Number(e.target.value) })}
+                          className="flex-1 px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none">
+                          <option value={0} className="bg-slate-800">— Select a course —</option>
+                          {courses.map(c => <option key={c.id} value={c.id} className="bg-slate-800">{c.name} {c.level ? `(${c.level})` : ''}{c.room ? ` · ${c.room}` : ''}</option>)}
+                        </select>
+                        <button onClick={() => setShowNewCourse(true)} className="px-3 py-2 rounded-lg text-xs font-bold text-white whitespace-nowrap" style={{ background: 'rgba(63,186,235,0.2)', border: '1px solid rgba(63,186,235,0.3)' }}>+ New</button>
+                      </div>
+                    )}
+                  </div>
+                  {newRoom.courseId > 0 && (
+                    <>
+                      <div>
+                        <label className="text-white/60 text-xs block mb-1">Room Number (for join link)</label>
+                        <input type="number" value={newRoom.roomId || ''} onChange={(e) => setNewRoom({ ...newRoom, roomId: Number(e.target.value) })}
+                          placeholder="e.g. 101" className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none" />
+                      </div>
+                      <div>
+                        <label className="text-white/60 text-xs block mb-1">Label (optional)</label>
+                        <input value={newRoom.label} onChange={(e) => setNewRoom({ ...newRoom, label: e.target.value })}
+                          placeholder="e.g. G1 · English" className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none" />
+                      </div>
+                      <div>
+                        <label className="text-white/60 text-xs block mb-1">Status</label>
+                        <select value={newRoom.status} onChange={(e) => setNewRoom({ ...newRoom, status: e.target.value as RoomStatus })}
+                          className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none">
+                          <option value="scheduled" className="bg-slate-800">Scheduled</option>
+                          <option value="live" className="bg-slate-800">Live</option>
+                          <option value="empty" className="bg-slate-800">Empty</option>
+                          <option value="locked" className="bg-slate-800">Locked</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="flex gap-3 mt-5 justify-end">
+                  <button onClick={() => setShowCreate(false)} className="px-4 py-2 rounded-lg text-sm text-white/60 bg-white/5">Cancel</button>
+                  <button onClick={createRoom} disabled={newRoom.courseId === 0} className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40" style={{ background: 'linear-gradient(135deg,#3FBAEB,#2563eb)' }}>Create Classroom</button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Inline new course form */}
+                <h4 className="text-sm font-bold text-sky-400 mb-3">+ Add New Course (manually)</h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-white/60 text-xs block mb-1">Course Name *</label>
+                    <input value={newCourse.name} onChange={(e) => setNewCourse({ ...newCourse, name: e.target.value })}
+                      placeholder="e.g. English B1, IELTS Prep, Math G5" className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-white/60 text-xs block mb-1">Level</label>
+                      <input value={newCourse.level} onChange={(e) => setNewCourse({ ...newCourse, level: e.target.value })}
+                        placeholder="B1, A2, G5" className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-white/60 text-xs block mb-1">Room</label>
+                      <input value={newCourse.room} onChange={(e) => setNewCourse({ ...newCourse, room: e.target.value })}
+                        placeholder="LAB 3, Room A" className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-white/60 text-xs block mb-1">Start Time</label>
+                      <input type="time" value={newCourse.startTime} onChange={(e) => setNewCourse({ ...newCourse, startTime: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-white/60 text-xs block mb-1">End Time</label>
+                      <input type="time" value={newCourse.endTime} onChange={(e) => setNewCourse({ ...newCourse, endTime: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-white/60 text-xs block mb-1">Teacher</label>
+                    <select value={newCourse.teacherId} onChange={(e) => setNewCourse({ ...newCourse, teacherId: Number(e.target.value) })}
+                      className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none">
+                      <option value={0} className="bg-slate-800">— No teacher —</option>
+                      {teachersList.map(t => <option key={t.id} value={t.id} className="bg-slate-800">{t.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-white/60 text-xs block mb-1">Teaching Days</label>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {[{n:0,l:'Sun'},{n:1,l:'Mon'},{n:2,l:'Tue'},{n:3,l:'Wed'},{n:4,l:'Thu'},{n:5,l:'Fri'},{n:6,l:'Sat'}].map(d => (
+                        <button key={d.n} onClick={() => toggleWeekday(d.n)}
+                          className="px-2.5 py-1 rounded-lg text-xs font-bold transition"
+                          style={{ background: newCourse.teachingWeekdays.includes(d.n) ? '#3FBAEB' : 'rgba(255,255,255,0.08)', color: newCourse.teachingWeekdays.includes(d.n) ? '#fff' : 'rgba(255,255,255,0.5)' }}>{d.l}</button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-5 justify-end">
+                  <button onClick={() => setShowNewCourse(false)} className="px-4 py-2 rounded-lg text-sm text-white/60 bg-white/5">← Back</button>
+                  <button onClick={createCourseInline} disabled={!newCourse.name.trim()} className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40" style={{ background: 'linear-gradient(135deg,#3FBAEB,#2563eb)' }}>Create Course & Select</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

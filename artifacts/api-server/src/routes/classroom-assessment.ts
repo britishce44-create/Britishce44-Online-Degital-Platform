@@ -588,6 +588,24 @@ router.post("/v1/classroom-assessment/enroll", async (req, res) => {
 
 /* ── Course CRUD: create / update courses with room + time ──────────────── */
 
+// List ALL courses (with teacher names + student counts) — for Classrooms page
+router.get("/v1/courses", async (req, res) => {
+  const user = getReqUser(req);
+  if (!user) return res.status(403).json({ message: "Forbidden" });
+  const allCourses = await db.select().from(courses).orderBy(courses.id);
+  const out = [];
+  for (const c of allCourses) {
+    let teacherName: string | null = null;
+    if (c.teacherId) {
+      const [t] = await db.select().from(teachers).where(eq(teachers.id, c.teacherId)).limit(1);
+      teacherName = t?.name ?? null;
+    }
+    const studentCount = (await db.select().from(students).where(eq(students.courseId, c.id))).length;
+    out.push({ ...c, teacherName, studentCount });
+  }
+  return res.json({ courses: out });
+});
+
 router.post("/v1/courses", async (req, res) => {
   const user = getReqUser(req);
   if (!user || (user.role !== "admin" && user.role !== "supervisor"))
