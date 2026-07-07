@@ -475,7 +475,6 @@ const SEED_COURSE_DEFS = [
   { name: "Grammar Workshop", level: "B1", room: "Room H", startTime: "09:45", endTime: "11:15" },
 ];
 
-const WEEKDAYS = [0, 1, 2, 3, 4]; // Sun–Thu
 
 export async function seedClassrooms(): Promise<void> {
   const allTeachers = await db.select().from(teachers).orderBy(teachers.id);
