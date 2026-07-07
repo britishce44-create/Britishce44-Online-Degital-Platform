@@ -289,6 +289,44 @@ export interface ClassroomRoom {
   endTime: string | null
 }
 
+/* ── Classroom sessions + anti-cheat + locker ── */
+
+export interface ClassroomSession {
+  id: number
+  classroomId: number | null
+  roomId: number
+  teacherId: number | null
+  antiCheatActive: boolean
+  roomLocked: boolean
+  startedAt: string
+  endedAt: string | null
+}
+
+export interface ClassroomAntiCheatLog {
+  id: number
+  sessionId: number
+  studentId: number | null
+  studentName: string | null
+  eventType: string
+  details: Record<string, unknown> | null
+  warningCount: number
+  blocked: boolean
+  createdAt: string
+}
+
+export interface ClassroomLockerItem {
+  id: number
+  classroomId: number | null
+  roomId: number | null
+  studentId: number | null
+  itemType: string
+  title: string
+  body: string | null
+  fileUrl: string | null
+  createdBy: string
+  createdAt: string
+}
+
 export interface Task {
   id: number
   title: string

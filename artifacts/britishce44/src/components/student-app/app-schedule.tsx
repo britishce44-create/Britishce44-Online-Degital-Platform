@@ -80,9 +80,14 @@ export function AppSchedule() {
                     <p className="text-[9px] text-gray-500">{cls.endTime}</p>
                   </div>
                   {isActive && (
-                    <button className="px-3 py-1.5 rounded-xl text-[10px] font-bold text-white transition"
+                    <button
+                      onClick={() => {
+                        const roomId = cls.courseId || Number(cls.room) || 0
+                        if (roomId > 0) window.open(`${window.location.origin}/?room=${roomId}`, '_blank')
+                      }}
+                      className="px-3 py-1.5 rounded-xl text-[10px] font-bold text-white transition"
                       style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', boxShadow: '0 2px 8px rgba(34,197,94,0.25)' }}>
-                      Join
+                      Join →
                     </button>
                   )}
                 </div>

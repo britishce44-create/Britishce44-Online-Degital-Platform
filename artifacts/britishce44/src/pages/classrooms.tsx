@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { apiGet, apiPost, apiDelete, type ClassroomRoom, type Course } from '@/lib/api'
+import { apiGet, apiPost, apiPatch, apiDelete, type ClassroomRoom, type Course } from '@/lib/api'
 
 type RoomStatus = 'live' | 'scheduled' | 'empty' | 'locked'
 
@@ -25,7 +25,12 @@ function copyJoinLink(roomId: number) {
   })
 }
 
-function ClassroomCard({ room, onEnter }: { room: ClassroomRoom; onEnter: (id: number) => void }) {
+function ClassroomCard({ room, onEnter, onEdit, onRoster }: {
+  room: ClassroomRoom
+  onEnter: (id: number) => void
+  onEdit: (room: ClassroomRoom) => void
+  onRoster: (room: ClassroomRoom) => void
+}) {
   const s = STATUS_CONFIG[room.status]
   const joinId = room.roomId || room.id
   return (
@@ -41,6 +46,12 @@ function ClassroomCard({ room, onEnter }: { room: ClassroomRoom; onEnter: (id: n
         boxShadow: room.status === 'live' ? s.glow : room.status === 'scheduled' ? s.glow : undefined,
       }}>
       <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: s.color, opacity: 0.7 }} />
+
+      {/* Admin buttons (top-right, hover-revealed) */}
+      <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition" onClick={(e) => e.stopPropagation()}>
+        <button onClick={() => onEdit(room)} className="w-7 h-7 rounded-full flex items-center justify-center text-xs bg-sky-500/40 hover:bg-sky-500/60 text-white transition" title="Edit">✏️</button>
+        <button onClick={() => onRoster(room)} className="w-7 h-7 rounded-full flex items-center justify-center text-xs bg-indigo-500/40 hover:bg-indigo-500/60 text-white transition" title="Students">👥</button>
+      </div>
 
       {/* Header row */}
       <div className="flex items-center justify-between px-3 pt-3">
@@ -61,7 +72,7 @@ function ClassroomCard({ room, onEnter }: { room: ClassroomRoom; onEnter: (id: n
       {/* Footer */}
       <div className="flex items-center justify-between px-3 pb-3">
         <div className="flex items-center gap-3 text-white/50 text-[11px]">
-          {room.status === 'live' && <span>👥 {room.studentCount}</span>}
+          {<span>👥 {room.studentCount}</span>}
           {room.startTime && <span>⏰ {room.startTime}{room.endTime ? `–${room.endTime}` : ''}</span>}
         </div>
         <div className="flex gap-1.5" onClick={(e) => e.stopPropagation()}>
@@ -109,6 +120,11 @@ export function ClassroomsPage({ onEnterClassroom }: { onEnterClassroom: (id: nu
     teachingWeekdays: [0, 1, 2, 3, 4] as number[], teacherId: 0,
   })
   const [teachersList, setTeachersList] = useState<{ id: number; name: string }[]>([])
+  const [editRoom, setEditRoom] = useState<ClassroomRoom | null>(null)
+  const [rosterRoom, setRosterRoom] = useState<ClassroomRoom | null>(null)
+  const [rosterStudents, setRosterStudents] = useState<{ id: number; name: string; level: string | null }[]>([])
+  const [allStudents, setAllStudents] = useState<{ id: number; name: string; level: string | null }[]>([])
+  const [editData, setEditData] = useState({ label: '', roomId: 0, status: 'scheduled' as RoomStatus, room: '', level: '', startTime: '08:00', endTime: '09:30', teacherId: 0, courseName: '' })
 
   const loadTeachers = useCallback(async () => {
     try {
@@ -212,6 +228,115 @@ export function ClassroomsPage({ onEnterClassroom }: { onEnterClassroom: (id: nu
     } catch { /* ignore */ }
   }
 
+  const openEdit = async (room: ClassroomRoom) => {
+    setEditRoom(room)
+    // Find the course for this room
+    const course = courses.find(c => c.id === room.courseId)
+    setEditData({
+      label: room.label || '',
+      roomId: room.roomId || 0,
+      status: room.status,
+      room: course?.room || '',
+      level: course?.level || '',
+      startTime: course?.startTime || '08:00',
+      endTime: course?.endTime || '09:30',
+      teacherId: course?.teacherId || 0,
+      courseName: course?.name || room.courseName || '',
+    })
+  }
+
+  const saveEdit = async () => {
+    if (!editRoom) return
+    try {
+      // Update classroom
+      await apiPatch(`/classrooms/${editRoom.id}`, {
+        label: editData.label || undefined,
+        roomId: editData.roomId || undefined,
+        status: editData.status,
+      })
+      // Update course (room, level, time, teacher)
+      if (editRoom.courseId) {
+        await apiPatch(`/courses/${editRoom.courseId}`, {
+          room: editData.room || undefined,
+          level: editData.level || undefined,
+          startTime: editData.startTime || undefined,
+          endTime: editData.endTime || undefined,
+          teacherId: editData.teacherId || undefined,
+        })
+      }
+      toast.success('Classroom updated')
+      setEditRoom(null)
+      await loadRooms()
+      await loadCourses()
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to update')
+    }
+  }
+
+  const openRoster = async (room: ClassroomRoom) => {
+    setRosterRoom(room)
+    try {
+      const r = await apiGet<{ students: { id: number; name: string; level: string | null }[] }>(`/classroom-assessment/courses/${room.courseId}/students`)
+      setRosterStudents(r.students)
+    } catch { setRosterStudents([]) }
+    // Load all students for the assign dropdown
+    try {
+      const tr = await apiGet<{ teachers: { id: number; name: string }[] }>('/classroom-assessment/teachers')
+      const allStu: { id: number; name: string; level: string | null }[] = []
+      for (const t of tr.teachers) {
+        try {
+          const cr = await apiGet<{ courses: Course[] }>(`/classroom-assessment/teachers/${t.id}/courses`)
+          for (const c of cr.courses) {
+            const sr = await apiGet<{ students: { id: number; name: string; level: string | null }[] }>(`/classroom-assessment/courses/${c.id}/students`)
+            for (const s of sr.students) {
+              if (!allStu.find(x => x.id === s.id)) allStu.push(s)
+            }
+          }
+        } catch {}
+      }
+      setAllStudents(allStu)
+    } catch { setAllStudents([]) }
+  }
+
+  const assignStudentToRoom = async (studentId: number) => {
+    if (!rosterRoom || !studentId) return
+    try {
+      await apiPost(`/courses/${rosterRoom.courseId}/assign-student`, { studentId })
+      toast.success('Student assigned')
+      await openRoster(rosterRoom)
+      await loadRooms()
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to assign')
+    }
+  }
+
+  const unassignStudent = async (studentId: number) => {
+    if (!rosterRoom) return
+    try {
+      // Set student's courseId to null via a PATCH — we need a route for this
+      // For now, use the enroll endpoint's delete (or just re-assign to 0)
+      // Simplest: PATCH the student via courses route — but we don't have a student PATCH.
+      // We'll use a trick: the assign-student route sets courseId. To unassign, we need
+      // a separate endpoint. For now, let's just re-fetch (the unassign can be added later).
+      toast('Unassign feature coming soon — use Users Manage to change the student\'s course', { duration: 3000 })
+    } catch (e: any) {
+      toast.error(e.message || 'Failed')
+    }
+  }
+
+  useEffect(() => {
+    // Load all students from Users Manage for the roster dropdown
+    const loadAllStudentsFromUsers = async () => {
+      try {
+        const r = await apiGet<{ users: { id: number; name: string; role: string; studentId?: number | null }[] }>('/users')
+        const stuUsers = r.users.filter(u => u.role === 'student' && u.studentId)
+        // Map to {id: studentId, name}
+        setAllStudents(stuUsers.map(u => ({ id: u.studentId!, name: u.name, level: null })))
+      } catch { /* ignore */ }
+    }
+    if (rosterRoom) loadAllStudentsFromUsers()
+  }, [rosterRoom])
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -264,12 +389,7 @@ export function ClassroomsPage({ onEnterClassroom }: { onEnterClassroom: (id: nu
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {paginated.map(room => (
             <div key={room.id} className="relative group">
-              <ClassroomCard room={room} onEnter={onEnterClassroom} />
-              <button
-                onClick={() => deleteRoom(room.id)}
-                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition text-red-400 text-xs px-1.5 py-0.5 rounded bg-black/30 z-10">
-                ✕
-              </button>
+              <ClassroomCard room={room} onEnter={onEnterClassroom} onEdit={openEdit} onRoster={openRoster} />
             </div>
           ))}
         </div>
@@ -399,6 +519,117 @@ export function ClassroomsPage({ onEnterClassroom }: { onEnterClassroom: (id: nu
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit classroom modal */}
+      {editRoom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setEditRoom(null)}>
+          <div className="rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" style={{ background: '#0b1640', border: '1px solid rgba(63,186,235,0.2)' }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-white">✏️ Edit Classroom #{editRoom.roomId || editRoom.id}</h3>
+              <div className="flex gap-2">
+                <button onClick={() => { deleteRoom(editRoom.id); setEditRoom(null) }} className="px-3 py-1.5 rounded-lg text-xs font-bold text-red-400 bg-red-500/10 border border-red-500/20">🗑 Delete</button>
+                <button onClick={() => setEditRoom(null)} className="text-white/50 hover:text-white">✕</button>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-white/60 text-xs block mb-1">Course Name</label>
+                <input value={editData.courseName} onChange={(e) => setEditData({ ...editData, courseName: e.target.value })} className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-white/60 text-xs block mb-1">Room Label (display)</label>
+                  <input value={editData.label} onChange={(e) => setEditData({ ...editData, label: e.target.value })} placeholder="G1 · English" className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none" />
+                </div>
+                <div>
+                  <label className="text-white/60 text-xs block mb-1">Room Number (join link)</label>
+                  <input type="number" value={editData.roomId || ''} onChange={(e) => setEditData({ ...editData, roomId: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none" />
+                </div>
+                <div>
+                  <label className="text-white/60 text-xs block mb-1">Physical Room</label>
+                  <input value={editData.room} onChange={(e) => setEditData({ ...editData, room: e.target.value })} placeholder="Room A, LAB 3" className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none" />
+                </div>
+                <div>
+                  <label className="text-white/60 text-xs block mb-1">Level</label>
+                  <input value={editData.level} onChange={(e) => setEditData({ ...editData, level: e.target.value })} placeholder="B1, G5" className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none" />
+                </div>
+                <div>
+                  <label className="text-white/60 text-xs block mb-1">Start Time</label>
+                  <input type="time" value={editData.startTime} onChange={(e) => setEditData({ ...editData, startTime: e.target.value })} className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none" />
+                </div>
+                <div>
+                  <label className="text-white/60 text-xs block mb-1">End Time</label>
+                  <input type="time" value={editData.endTime} onChange={(e) => setEditData({ ...editData, endTime: e.target.value })} className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-white/60 text-xs block mb-1">Teacher</label>
+                  <select value={editData.teacherId} onChange={(e) => setEditData({ ...editData, teacherId: Number(e.target.value) })} className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none">
+                    <option value={0} className="bg-slate-800">— No teacher —</option>
+                    {teachersList.map(t => <option key={t.id} value={t.id} className="bg-slate-800">{t.name}</option>)}
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-white/60 text-xs block mb-1">Status</label>
+                  <select value={editData.status} onChange={(e) => setEditData({ ...editData, status: e.target.value as RoomStatus })} className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none">
+                    <option value="scheduled" className="bg-slate-800">Scheduled</option>
+                    <option value="live" className="bg-slate-800">Live</option>
+                    <option value="empty" className="bg-slate-800">Empty</option>
+                    <option value="locked" className="bg-slate-800">Locked</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5 justify-end">
+              <button onClick={() => setEditRoom(null)} className="px-4 py-2 rounded-lg text-sm text-white/60 bg-white/5">Cancel</button>
+              <button onClick={saveEdit} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'linear-gradient(135deg,#3FBAEB,#2563eb)' }}>💾 Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Roster modal */}
+      {rosterRoom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setRosterRoom(null)}>
+          <div className="rounded-2xl p-6 w-full max-w-md max-h-[80vh] overflow-y-auto" style={{ background: '#0b1640', border: '1px solid rgba(63,186,235,0.2)' }} onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-white">👥 {rosterRoom.courseName || rosterRoom.label} — Students</h3>
+              <button onClick={() => setRosterRoom(null)} className="text-white/50 hover:text-white">✕</button>
+            </div>
+
+            {/* Enrolled students */}
+            <div className="mb-4">
+              <p className="text-white/60 text-xs mb-2 font-semibold">Enrolled ({rosterStudents.length})</p>
+              {rosterStudents.length === 0 ? (
+                <p className="text-white/30 text-sm py-4 text-center">No students enrolled yet</p>
+              ) : (
+                <div className="space-y-1">
+                  {rosterStudents.map(s => (
+                    <div key={s.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5">
+                      <div>
+                        <p className="text-sm text-white font-medium">{s.name}</p>
+                        {s.level && <p className="text-[10px] text-white/40">{s.level}</p>}
+                      </div>
+                      <button onClick={() => unassignStudent(s.id)} className="text-[10px] text-red-400 hover:text-red-300 px-2 py-1 rounded">✕ Remove</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Assign new student */}
+            <div className="pt-3 border-t border-white/10">
+              <p className="text-white/60 text-xs mb-2 font-semibold">Assign a student</p>
+              <select onChange={(e) => { if (e.target.value) assignStudentToRoom(Number(e.target.value)); e.target.value = '' }} defaultValue="" className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white outline-none">
+                <option value="" className="bg-slate-800">— Select a student to assign —</option>
+                {allStudents
+                  .filter(s => !rosterStudents.find(rs => rs.id === s.id))
+                  .map(s => <option key={s.id} value={s.id} className="bg-slate-800">{s.name}{s.level ? ` (${s.level})` : ''}</option>)}
+              </select>
+              <p className="text-[10px] text-white/30 mt-2">Students are coordinated with Users Manage. Only students created in Users Manage appear here.</p>
+            </div>
           </div>
         </div>
       )}

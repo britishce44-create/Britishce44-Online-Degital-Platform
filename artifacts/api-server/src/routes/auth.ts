@@ -95,7 +95,7 @@ router.post("/v1/auth/login", async (req, res) => {
             }
           }
           context = {
-            classroomNum: courseData?.room ? 0 : (s.courseId ?? 0),
+            classroomNum: s.courseId ?? 0,
             room: courseData?.room ?? null,
             teacher: teacherName,
             level: s.level ?? courseData?.level ?? null,

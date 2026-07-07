@@ -12,6 +12,7 @@ import {
   evalTemplates,
   evalCriteria,
   evalSheets,
+  classrooms,
 } from "@workspace/db";
 import { nthTeachingDayISO } from "./teaching-days";
 import { logger } from "./logger";
@@ -459,4 +460,83 @@ export async function seedEval(): Promise<void> {
   }
 
   logger.info({ templates: EVAL_TEMPLATES.length }, "Eval templates seeded");
+}
+
+/* ── Classroom seed (idempotent) — creates 40 classrooms ────────────────── */
+
+const SEED_COURSE_DEFS = [
+  { name: "English B1", level: "B1", room: "Room A", startTime: "08:00", endTime: "09:30" },
+  { name: "IELTS Prep", level: "Advanced", room: "Room B", startTime: "09:45", endTime: "11:15" },
+  { name: "Math G5", level: "Grade 5", room: "Room C", startTime: "11:30", endTime: "13:00" },
+  { name: "Science G3", level: "Grade 3", room: "Room D", startTime: "13:15", endTime: "14:45" },
+  { name: "Arabic A2", level: "A2", room: "Room E", startTime: "15:00", endTime: "16:30" },
+  { name: "Conversational English", level: "B2", room: "Room F", startTime: "16:45", endTime: "18:15" },
+  { name: "English A1", level: "A1", room: "Room G", startTime: "08:00", endTime: "09:30" },
+  { name: "Grammar Workshop", level: "B1", room: "Room H", startTime: "09:45", endTime: "11:15" },
+];
+
+const WEEKDAYS = [0, 1, 2, 3, 4]; // Sun–Thu
+
+export async function seedClassrooms(): Promise<void> {
+  const allTeachers = await db.select().from(teachers).orderBy(teachers.id);
+  if (!allTeachers.length) {
+    logger.warn("No teachers found — skipping classroom seed");
+    return;
+  }
+
+  // Ensure the seed courses exist (matched by name)
+  const existingCourses = await db.select().from(courses);
+  const existingNames = new Set(existingCourses.map((c) => c.name));
+
+  const courseIds: number[] = [];
+  for (const def of SEED_COURSE_DEFS) {
+    let c = existingCourses.find((c) => c.name === def.name);
+    if (!c) {
+      const teacherIdx = SEED_COURSE_DEFS.indexOf(def) % allTeachers.length;
+      const [ins] = await db
+        .insert(courses)
+        .values({
+          name: def.name,
+          level: def.level,
+          teacherId: allTeachers[teacherIdx].id,
+          termLabel: TERM_LABEL,
+          termStartDate: new Date().toISOString().split("T")[0],
+          teachingWeekdays: WEEKDAYS,
+          room: def.room,
+          startTime: def.startTime,
+          endTime: def.endTime,
+        })
+        .returning();
+      c = ins;
+    }
+    courseIds.push(c.id);
+  }
+
+  // Create 40 classrooms (room IDs 101–140) across the courses
+  const existingRooms = await db.select().from(classrooms);
+  const existingRoomIds = new Set(existingRooms.map((r) => r.roomId));
+
+  const toInsert: typeof classrooms.$inferInsert[] = [];
+  for (let i = 0; i < 40; i++) {
+    const roomId = 101 + i;
+    if (existingRoomIds.has(roomId)) continue;
+    const courseIdx = i % courseIds.length;
+    const course = SEED_COURSE_DEFS[courseIdx];
+    const grade = Math.floor(i / 8) + 1;
+    const statuses = ["scheduled", "empty", "scheduled", "live", "empty", "scheduled", "locked", "empty"] as const;
+    toInsert.push({
+      courseId: courseIds[courseIdx],
+      roomId,
+      label: `G${grade} · ${course.name}`,
+      status: statuses[i % statuses.length],
+      active: true,
+    });
+  }
+
+  if (toInsert.length) {
+    await db.insert(classrooms).values(toInsert);
+    logger.info({ count: toInsert.length }, "Classrooms seeded (40 rooms, IDs 101–140)");
+  } else {
+    logger.info("Classroom seed skipped — all 40 rooms already exist");
+  }
 }
