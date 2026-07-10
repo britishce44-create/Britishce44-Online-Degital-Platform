@@ -29,7 +29,7 @@ export class SignalingService {
     return new Promise((resolve, reject) => {
       const url = (import.meta.env.VITE_SIGNALING_URL as string) || window.location.origin;
       this.socket = io(`${url}/signaling`, {
-        path: '/api/socket.io',
+        path: '/signaling',
         transports: ['websocket'],
         forceNew: true,
       });

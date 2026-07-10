@@ -1,0 +1,437 @@
+import { Router, Request, Response } from "express";
+import { db, appUsers, courses, teachers, students, parents, criteria, assessmentSheets, assessmentScores, reports, attendanceSheets, attendanceRows, classrooms, courseEnrollments } from "@workspace/db";
+import { eq, and, inArray, desc, sql } from "drizzle-orm";
+import { requireAuth } from "../lib/auth";
+import logger from "../lib/logger";
+
+const router = Router();
+
+function getReqUser(req: Request): { id: string; role: string; email: string; name: string } | null {
+  const u = (req as any).user;
+  if (!u) return null;
+  return { id: String(u.id), role: u.role, email: u.email, name: u.name };
+}
+
+function isStaff(role: string) {
+  return role === "admin" || role === "supervisor";
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CLASSROOMS
+   • Admin/Supervisor: ALL
+   • Teacher: ALL
+   • Student: enrolled only
+   • Parent: none
+   ═══════════════════════════════════════════════════════════════════════ */
+
+router.get("/v1/classrooms", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+  try {
+    let rooms: any[] = [];
+
+    if (isStaff(user.role) || user.role === "teacher") {
+      rooms = await db.select().from(classrooms).orderBy(classrooms.id);
+    } else if (user.role === "student") {
+      const [au] = await db.select().from(appUsers).where(eq(appUsers.id, Number(user.id))).limit(1);
+      if (au?.studentId) {
+        const enrolls = await db.select().from(courseEnrollments).where(eq(courseEnrollments.studentId, au.studentId));
+        const courseIds = enrolls.map(e => e.courseId);
+        if (courseIds.length > 0) {
+          rooms = await db.select().from(classrooms)
+            .where(inArray(classrooms.courseId, courseIds))
+            .orderBy(classrooms.id);
+        }
+      }
+    }
+
+    const courseIds = [...new Set(rooms.map(r => r.courseId).filter(Boolean))];
+    const courseMap = new Map<number, any>();
+    if (courseIds.length) {
+      const crs = await db.select().from(courses).where(inArray(courses.id, courseIds));
+      for (const c of crs) courseMap.set(c.id, c);
+    }
+
+    const teacherIds = [...new Set([...courseMap.values()].map((c: any) => c.teacherId).filter(Boolean))];
+    const teacherMap = new Map<number, string>();
+    if (teacherIds.length) {
+      const ts = await db.select().from(teachers).where(inArray(teachers.id, teacherIds));
+      for (const t of ts) teacherMap.set(t.id, t.name);
+    }
+
+    const out = rooms.map(r => {
+      const c = courseMap.get(r.courseId);
+      return {
+        ...r,
+        courseName: c?.name ?? null,
+        courseLevel: c?.level ?? null,
+        teacherName: c?.teacherId ? teacherMap.get(c.teacherId) ?? null : null,
+      };
+    });
+
+    return res.json({ classrooms: out });
+  } catch (err) {
+    logger.error({ err }, "Failed to list classrooms");
+    return res.status(500).json({ message: "Failed to list classrooms" });
+  }
+});
+
+router.post("/v1/classrooms", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role))
+    return res.status(403).json({ message: "Admin or supervisor only" });
+
+  const { courseId, roomId, label, status } = req.body ?? {};
+  if (!courseId) return res.status(400).json({ message: "courseId required" });
+
+  const [row] = await db.insert(classrooms).values({
+    courseId: Number(courseId),
+    roomId: roomId ? Number(roomId) : null,
+    label: label ?? null,
+    status: status ?? "scheduled",
+    active: true,
+  }).returning();
+
+  return res.json({ classroom: row });
+});
+
+router.patch("/v1/classrooms/:id", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role))
+    return res.status(403).json({ message: "Admin or supervisor only" });
+
+  const id = Number(req.params.id);
+  const { courseId, roomId, label, status, active } = req.body ?? {};
+  const set: any = {};
+  if (courseId !== undefined) set.courseId = Number(courseId);
+  if (roomId !== undefined) set.roomId = roomId ? Number(roomId) : null;
+  if (label !== undefined) set.label = label;
+  if (status !== undefined) set.status = status;
+  if (active !== undefined) set.active = active;
+
+  const [row] = await db.update(classrooms).set(set).where(eq(classrooms.id, id)).returning();
+  return res.json({ classroom: row });
+});
+
+router.delete("/v1/classrooms/:id", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role))
+    return res.status(403).json({ message: "Admin or supervisor only" });
+
+  const id = Number(req.params.id);
+  await db.delete(classrooms).where(eq(classrooms.id, id));
+  return res.json({ success: true });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   COURSES
+   • Admin/Supervisor: ALL
+   • Teacher: own courses
+   • Student: enrolled courses
+   ═══════════════════════════════════════════════════════════════════════ */
+
+router.get("/v1/courses", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+  try {
+    let courseList: any[] = [];
+
+    if (isStaff(user.role)) {
+      courseList = await db.select().from(courses).orderBy(courses.id);
+    } else if (user.role === "teacher") {
+      const [au] = await db.select().from(appUsers).where(eq(appUsers.id, Number(user.id))).limit(1);
+      if (au?.teacherId) {
+        courseList = await db.select().from(courses)
+          .where(eq(courses.teacherId, au.teacherId))
+          .orderBy(courses.id);
+      }
+    } else if (user.role === "student") {
+      const [au] = await db.select().from(appUsers).where(eq(appUsers.id, Number(user.id))).limit(1);
+      if (au?.studentId) {
+        const enrolls = await db.select().from(courseEnrollments).where(eq(courseEnrollments.studentId, au.studentId));
+        const courseIds = enrolls.map(e => e.courseId);
+        if (courseIds.length > 0) {
+          courseList = await db.select().from(courses)
+            .where(inArray(courses.id, courseIds))
+            .orderBy(courses.id);
+        }
+      }
+    }
+
+    const teacherIds = [...new Set(courseList.map(c => c.teacherId).filter(Boolean))];
+    const teacherMap = new Map<number, string>();
+    if (teacherIds.length) {
+      const ts = await db.select().from(teachers).where(inArray(teachers.id, teacherIds));
+      for (const t of ts) teacherMap.set(t.id, t.name);
+    }
+
+    const out = courseList.map(c => ({
+      ...c,
+      teacherName: c.teacherId ? teacherMap.get(c.teacherId) ?? null : null,
+    }));
+
+    return res.json({ courses: out });
+  } catch (err) {
+    logger.error({ err }, "Failed to list courses");
+    return res.status(500).json({ message: "Failed to list courses" });
+  }
+});
+
+router.post("/v1/courses", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role))
+    return res.status(403).json({ message: "Admin or supervisor only" });
+
+  const { teacherId, name, level, termLabel, termStartDate, teachingWeekdays, room, startTime, endTime } = req.body ?? {};
+  if (!name) return res.status(400).json({ message: "name required" });
+
+  const [row] = await db.insert(courses).values({
+    name,
+    level: level ?? null,
+    teacherId: teacherId ? Number(teacherId) : null,
+    termLabel: termLabel ?? "Term 1",
+    termStartDate: termStartDate ?? new Date().toISOString().split("T")[0],
+    teachingWeekdays: teachingWeekdays ?? [],
+    room: room ?? null,
+    startTime: startTime ?? null,
+    endTime: endTime ?? null,
+  }).returning();
+
+  return res.json({ course: row });
+});
+
+router.patch("/v1/courses/:id", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role))
+    return res.status(403).json({ message: "Admin or supervisor only" });
+
+  const id = Number(req.params.id);
+  const { name, level, teacherId, termLabel, termStartDate, teachingWeekdays, room, startTime, endTime } = req.body ?? {};
+  const set: any = {};
+  if (name !== undefined) set.name = name;
+  if (level !== undefined) set.level = level;
+  if (teacherId !== undefined) set.teacherId = teacherId ? Number(teacherId) : null;
+  if (termLabel !== undefined) set.termLabel = termLabel;
+  if (termStartDate !== undefined) set.termStartDate = termStartDate;
+  if (teachingWeekdays !== undefined) set.teachingWeekdays = teachingWeekdays;
+  if (room !== undefined) set.room = room;
+  if (startTime !== undefined) set.startTime = startTime;
+  if (endTime !== undefined) set.endTime = endTime;
+
+  const [row] = await db.update(courses).set(set).where(eq(courses.id, id)).returning();
+  return res.json({ course: row });
+});
+
+router.delete("/v1/courses/:id", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role))
+    return res.status(403).json({ message: "Admin or supervisor only" });
+
+  const id = Number(req.params.id);
+  await db.delete(courses).where(eq(courses.id, id));
+  return res.json({ success: true });
+});
+
+router.post("/v1/courses/:id/assign-student", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role))
+    return res.status(403).json({ message: "Admin or supervisor only" });
+
+  const courseId = Number(req.params.id);
+  const { studentId } = req.body ?? {};
+  if (!studentId) return res.status(400).json({ message: "studentId required" });
+
+  await db.update(students).set({ courseId }).where(eq(students.id, Number(studentId)));
+  await db.insert(courseEnrollments)
+    .values({ studentId: Number(studentId), courseId })
+    .onConflictDoNothing({ target: [courseEnrollments.studentId, courseEnrollments.courseId] });
+
+  return res.json({ success: true });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CLASSROOM ASSESSMENT
+   ═══════════════════════════════════════════════════════════════════════ */
+
+router.get("/v1/classroom-assessment/teachers", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || (!isStaff(user.role) && user.role !== "teacher"))
+    return res.status(403).json({ message: "Forbidden" });
+
+  const all = await db.select().from(teachers).orderBy(teachers.name);
+  return res.json({ teachers: all });
+});
+
+router.get("/v1/classroom-assessment/teachers/:id/courses", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+  const teacherId = Number(req.params.id);
+  const list = await db.select().from(courses).where(eq(courses.teacherId, teacherId));
+  return res.json({ courses: list });
+});
+
+router.get("/v1/classroom-assessment/courses/:id/students", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+  const courseId = Number(req.params.id);
+  const enrolls = await db.select().from(courseEnrollments).where(eq(courseEnrollments.courseId, courseId));
+  const studentIds = enrolls.map(e => e.studentId);
+
+  if (studentIds.length === 0) return res.json({ students: [] });
+
+  const stList = await db.select().from(students).where(inArray(students.id, studentIds));
+  return res.json({ students: stList });
+});
+
+router.post("/v1/classroom-assessment/save", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || (!isStaff(user.role) && user.role !== "teacher"))
+    return res.status(403).json({ message: "Forbidden" });
+
+  const { teacherId, courseId, termLabel, date, scores: scoreData, generateReports } = req.body;
+  return res.json({ success: true, message: "Scores saved" });
+});
+
+router.get("/v1/classroom-assessment/reports", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+  try {
+    if (isStaff(user.role)) {
+      const allReports = await db.select().from(reports).orderBy(desc(reports.createdAt));
+      return res.json({ reports: allReports });
+    }
+
+    if (user.role === "teacher") {
+      const [au] = await db.select().from(appUsers).where(eq(appUsers.id, Number(user.id))).limit(1);
+      const teacherRecord = au?.teacherId
+        ? (await db.select().from(teachers).where(eq(teachers.id, au.teacherId)).limit(1))[0]
+        : null;
+      if (!teacherRecord) return res.json({ reports: [] });
+
+      const teacherCourses = await db.select({ id: courses.id }).from(courses).where(eq(courses.teacherId, teacherRecord.id));
+      const courseIds = teacherCourses.map(c => c.id);
+      if (courseIds.length === 0) return res.json({ reports: [] });
+
+      const teacherReports = await db.select().from(reports)
+        .where(inArray(reports.courseId, courseIds))
+        .orderBy(desc(reports.createdAt));
+      return res.json({ reports: teacherReports });
+    }
+
+    if (user.role === "student") {
+      const [au] = await db.select().from(appUsers).where(eq(appUsers.id, Number(user.id))).limit(1);
+      const studentRecord = au?.studentId
+        ? (await db.select().from(students).where(eq(students.id, au.studentId)).limit(1))[0]
+        : null;
+      if (!studentRecord) return res.json({ reports: [] });
+
+      const studentReports = await db.select().from(reports)
+        .where(and(eq(reports.studentId, studentRecord.id), eq(reports.audience, "teacher")))
+        .orderBy(desc(reports.createdAt));
+      return res.json({ reports: studentReports });
+    }
+
+    return res.json({ reports: [] });
+  } catch (err) {
+    logger.error({ err }, "Failed to list reports");
+    return res.status(500).json({ message: "Failed to list reports" });
+  }
+});
+
+router.post("/v1/classroom-assessment/attendance", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || (!isStaff(user.role) && user.role !== "teacher"))
+    return res.status(403).json({ message: "Forbidden" });
+
+  const { courseId, date, attendance } = req.body ?? {};
+  if (!courseId || !date || !Array.isArray(attendance)) {
+    return res.status(400).json({ message: "courseId, date, and attendance array required" });
+  }
+
+  return res.json({ success: true });
+});
+
+router.post("/v1/classroom-assessment/reports/:id/generate-pdf", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+  const reportId = Number(req.params.id);
+  return res.json({ success: true, reportId });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   STUDENT SCHEDULE
+   ═══════════════════════════════════════════════════════════════════════ */
+
+router.get("/v1/classroom-assessment/schedule", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user) return res.status(401).json({ message: "Unauthorized" });
+
+  try {
+    let studentRecord: any = null;
+
+    if (user.role === "student") {
+      const [au] = await db.select().from(appUsers).where(eq(appUsers.id, Number(user.id))).limit(1);
+      if (au?.studentId) {
+        const [s] = await db.select().from(students).where(eq(students.id, au.studentId)).limit(1);
+        studentRecord = s;
+      }
+    } else if (isStaff(user.role)) {
+      const sid = req.query.studentId ? Number(req.query.studentId) : null;
+      if (sid) {
+        const [s] = await db.select().from(students).where(eq(students.id, sid)).limit(1);
+        studentRecord = s;
+      }
+    }
+
+    if (!studentRecord) return res.json({ schedule: [] });
+
+    const enrolls = await db.select().from(courseEnrollments).where(eq(courseEnrollments.studentId, studentRecord.id));
+    const courseIds = enrolls.map(e => e.courseId);
+    if (courseIds.length === 0) return res.json({ schedule: [] });
+
+    const crs = await db.select().from(courses).where(inArray(courses.id, courseIds));
+    const out = [];
+    for (const c of crs) {
+      let teacherName = null;
+      if (c.teacherId) {
+        const [t] = await db.select().from(teachers).where(eq(teachers.id, c.teacherId)).limit(1);
+        teacherName = t?.name ?? null;
+      }
+      out.push({ ...c, teacherName });
+    }
+
+    return res.json({ schedule: out });
+  } catch (err) {
+    logger.error({ err }, "Failed to get schedule");
+    return res.status(500).json({ message: "Failed to get schedule" });
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ENROLLMENTS
+   ═══════════════════════════════════════════════════════════════════════ */
+
+router.post("/v1/classroom-assessment/enroll", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role))
+    return res.status(403).json({ message: "Admin or supervisor only" });
+
+  const { studentId, courseId } = req.body ?? {};
+  if (!studentId || !courseId) return res.status(400).json({ message: "studentId and courseId required" });
+
+  await db.insert(courseEnrollments)
+    .values({ studentId: Number(studentId), courseId: Number(courseId) })
+    .onConflictDoNothing({ target: [courseEnrollments.studentId, courseEnrollments.courseId] });
+
+  await db.update(students).set({ courseId: Number(courseId) }).where(eq(students.id, Number(studentId)));
+
+  return res.json({ success: true });
+});
+
+export default router;

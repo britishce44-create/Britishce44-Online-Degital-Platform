@@ -5,12 +5,6 @@ import { AssessmentAdmin } from './academic-room-assessment'
 import { EvalAdmin } from './academic-room-eval'
 import { GoogleFormsSection } from './google-forms'
 import { ScreenConsentViewer } from '@/components/exams/screen-consent-viewer'
-import { QuizScheduler } from '@/components/quizzes/quiz-scheduler'
-import { MeetingRoomWindow } from '@/components/meeting/meeting-room-window'
-import { WebRTCProvider } from '@/components/webrtc/webrtc-provider'
-import { useAuth, NewcomerData } from '@/components/providers/auth-provider'
-import { PlacementsPage } from '@/pages/placements'
-import { StudentRecordArchive } from '@/components/student-records/student-record-archive'
 
 /* Academic Management Room — Comprehensive center for all academic operations */
 
@@ -104,8 +98,7 @@ const PAY_CFG = {
 }
 
 export function AcademicRoomPage() {
-  const { user, getNewcomers, updateNewcomerStatus } = useAuth()
-  const [tab,setTab]=useState<TabWithNewcomers>('overview')
+  const [tab,setTab]=useState<Tab>('overview')
   const [students,setStudents]=useState<Student[]>(SEED_STUDENTS)
   const [search,setSearch]=useState('')
   const [statusFilter,setStatusFilter]=useState<string>('all')
@@ -114,25 +107,6 @@ export function AcademicRoomPage() {
   const [meetingActive,setMeetingActive]=useState(false)
   const [meetingMinimized,setMeetingMinimized]=useState(false)
   const [screenViewer,setScreenViewer]=useState<{name:string;ctx:string}|null>(null)
-  const [newcomers, setNewcomers] = useState<NewcomerData[]>([])
-  const [selectedNewcomer, setSelectedNewcomer] = useState<NewcomerData | null>(null)
-  const [interviewMeeting, setInterviewMeeting] = useState(false)
-  const [placementTestActive, setPlacementTestActive] = useState(false)
-
-  useEffect(() => {
-    if (user?.role === 'admin' || user?.role === 'supervisor') {
-      setNewcomers(getNewcomers())
-    }
-  }, [user, getNewcomers])
-
-  // Refetch newcomers every 5 seconds for real-time updates
-  useEffect(() => {
-    if (user?.role !== 'admin' && user?.role !== 'supervisor') return
-    const interval = setInterval(() => {
-      setNewcomers(getNewcomers())
-    }, 5000)
-    return () => clearInterval(interval)
-  }, [user, getNewcomers])
 
   // ── Ghost monitor + recorder ──
   const [ghostMic,setGhostMic]=useState(false)
@@ -204,11 +178,8 @@ export function AcademicRoomPage() {
       &&(statusFilter==='all'||s.status===statusFilter)
   })
 
-  type TabWithNewcomers = Tab | 'newcomers' | 'studentsrecords'
-  const tabs: {id:TabWithNewcomers;label:string;labelAr:string;emoji:string}[] = [
+  const tabs: {id:Tab;label:string;labelAr:string;emoji:string}[] = [
     {id:'overview',label:'Overview',labelAr:'نظرة عامة',emoji:'📊'},
-    {id:'newcomers',label:'Newcomers',labelAr:'الوافدون الجدد',emoji:'🆕'},
-    {id:'studentsrecords',label:'Student Records',labelAr:'سجلات الطلاب',emoji:'📚'},
     {id:'monitor',label:'Live Monitor',labelAr:'المراقبة المباشرة',emoji:'👁'},
     {id:'writer',label:'Text Writer',labelAr:'محرر النصوص',emoji:'✍️'},
     {id:'intake',label:'New Intake',labelAr:'القبول الجديد',emoji:'🎓'},
@@ -222,99 +193,37 @@ export function AcademicRoomPage() {
     {id:'teachereval',label:'Teacher Evaluation',labelAr:'تقييم المعلمين',emoji:'⭐'},
   ]
 
-  // ── Newcomer waiting room ──
-  if (user?.role === 'newcomer') {
-    const nd = user.newcomerData
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6" style={{background:'linear-gradient(135deg, #0a1628, #1a1a4e)'}}>
-        <div className="w-full max-w-md rounded-3xl overflow-hidden"
-          style={{background:'rgba(20,30,80,0.90)',backdropFilter:'blur(20px)',border:'1px solid rgba(212,160,23,0.25)',boxShadow:'0 32px 64px rgba(0,0,0,0.5)'}}>
-          <div className="h-1 golden-gradient" />
-          <div className="p-8 text-center">
-            <div className="w-24 h-24 rounded-full mx-auto mb-5 flex items-center justify-center"
-              style={{background:'rgba(212,160,23,0.12)',border:'2px solid rgba(212,160,23,0.25)'}}>
-              <span className="text-5xl">🎥</span>
-            </div>
-            <h2 className="text-2xl font-black text-white mb-2" style={{fontFamily:'Cairo, sans-serif'}}>
-              Interview Waiting Room
-            </h2>
-            <p className="text-sm text-golden-bright/80 mb-1 font-medium">Welcome, {nd?.firstName} {nd?.lastName}!</p>
-            <p className="text-xs text-gray-400 mb-6">A supervisor will meet with you shortly for your placement interview.</p>
-
-            <div className="rounded-2xl p-4 mb-6 text-left" style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.06)'}}>
-              <p className="text-xs font-bold text-gray-300 mb-3">📋 Your Details</p>
-              <div className="space-y-1.5 text-xs text-gray-400">
-                <p><span className="text-gray-300">Name:</span> {nd?.firstName} {nd?.lastName}</p>
-                <p><span className="text-gray-300">Gmail:</span> {nd?.gmail}</p>
-                <p><span className="text-gray-300">Phone:</span> {nd?.callPhone || nd?.whatsappPhone || '—'}</p>
-                <p><span className="text-gray-300">City/Country:</span> {nd?.city || '—'} {nd?.country ? `· ${nd.country}` : ''}</p>
-                <p><span className="text-gray-300">Status:</span> <span className="text-golden-bright">{nd?.status || 'waiting'}</span></p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-center gap-3 py-3 px-4 rounded-xl mb-4" style={{background:'rgba(52,211,153,0.06)',border:'1px solid rgba(52,211,153,0.15)'}}>
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-xs text-emerald-400 font-bold">Waiting for supervisor to connect…</span>
-            </div>
-
-            <button onClick={() => setInterviewMeeting(true)}
-              className="w-full py-3.5 rounded-xl font-bold text-sm transition-all golden-gradient text-white mb-3"
-              style={{boxShadow:'0 4px 20px rgba(212,160,23,0.35)',fontFamily:'Cairo, sans-serif'}}>
-              🎥 Meet the Supervisor · مقابلة المشرف
-            </button>
-
-            <p className="text-[10px] text-gray-500">The placement interview includes a video call and a short English assessment.</p>
-          </div>
-        </div>
-        {/* Floating interview meeting room */}
-        <AnimatePresence>
-          {interviewMeeting && nd && (
-            <WebRTCProvider>
-              <MeetingRoomWindow
-                studentName={`${nd.firstName} ${nd.lastName}`}
-                isInterview={true}
-                interviewNewcomerId={nd.id}
-                onPlacementTestGranted={() => setPlacementTestActive(true)}
-                onClose={() => { setInterviewMeeting(false); setPlacementTestActive(false) }}
-              />
-            </WebRTCProvider>
-          )}
-        </AnimatePresence>
-      </div>
-    )
-  }
-
   const statusCounts=Object.keys(STATUS_CFG).reduce((a,s)=>({...a,[s]:students.filter(st=>st.status===s).length}),{} as Record<string,number>)
 
   return (
     <div className="space-y-5 animate-fade-in">
       {/* Page header */}
-      <div className="rounded-2xl p-5 relative overflow-hidden blue-gradient"
-        style={{border:'1px solid rgba(212,160,23,0.25)',boxShadow:'0 8px 32px rgba(30,58,138,0.35)'}}>
-        <div className="absolute inset-0 opacity-[0.03]"
-          style={{backgroundImage:'radial-gradient(circle, rgba(212,160,23,0.7) 1px, transparent 1px)',backgroundSize:'20px 20px'}} />
-        <div className="absolute top-0 right-0 w-48 h-full pointer-events-none opacity-15"
-          style={{background:'radial-gradient(ellipse at right,#D4A017,transparent)'}} />
+      <div className="rounded-2xl p-5 relative overflow-hidden"
+        style={{background:'linear-gradient(135deg,#17125c 0%,#1d1668 50%,#17125c 100%)',border:'1px solid rgba(0, 174, 116,0.22)',boxShadow:'0 8px 32px rgba(0,0,0,0.35)'}}>
+        <div className="absolute inset-0 opacity-[0.025]"
+          style={{backgroundImage:'radial-gradient(circle, rgba(0, 174, 116,0.9) 1px, transparent 1px)',backgroundSize:'20px 20px'}} />
+        <div className="absolute top-0 right-0 w-48 h-full pointer-events-none opacity-10"
+          style={{background:'radial-gradient(ellipse at right,#00875a,transparent)'}} />
         <div className="relative flex items-center justify-between flex-wrap gap-3">
           <div>
             <div className="flex items-center gap-3 mb-1">
               <img src="/center-logo.png" alt="BC" className="w-10 h-10 rounded-xl object-contain bg-white p-0.5 shadow-lg" />
               <div>
-                <h2 className="text-xl font-black text-white drop-shadow-sm">🏛 Academic Management Room</h2>
-                <p className="text-xs text-golden-bright/60 font-medium" style={{fontFamily:'Tajawal,sans-serif'}}>غرفة الإدارة الأكاديمية · المركز البريطاني الأول</p>
+                <h2 className="text-xl font-black text-white">🏛 Academic Management Room</h2>
+                <p className="text-xs text-amber-400/50" style={{fontFamily:'Tajawal,sans-serif'}}>غرفة الإدارة الأكاديمية · المركز البريطاني الأول</p>
               </div>
             </div>
-            <p className="text-xs text-gray-300 mt-1 font-medium">Complete academic control · Student intake · Schedules · Templates · Reports</p>
+            <p className="text-xs text-white/30 mt-1">Complete academic control · Student intake · Schedules · Templates · Reports</p>
           </div>
           <div className="flex gap-2 flex-wrap">
             <button onClick={()=>{setMeetingActive(true);setMeetingMinimized(false)}}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold golden-gradient"
-              style={{color:'#fff',boxShadow:'0 4px 16px rgba(212,160,23,0.30)'}}>
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold"
+              style={{background:'linear-gradient(135deg,#00ae74,#00ae74)',color:'#fff',boxShadow:'0 4px 16px rgba(16,185,129,0.25)'}}>
               🎥 Start Meeting
             </button>
             <button onClick={()=>setTab('intake')}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold"
-              style={{background:'linear-gradient(135deg,#2563eb,#1d4ed8)',color:'#fff',boxShadow:'0 4px 16px rgba(37,99,235,0.25)'}}>
+              style={{background:'linear-gradient(135deg,#00875a,#00ae74)',color:'#17125c',boxShadow:'0 4px 16px rgba(0, 174, 116,0.25)'}}>
               ➕ New Intake
             </button>
           </div>
@@ -342,87 +251,11 @@ export function AcademicRoomPage() {
         {tabs.map(t=>(
           <button key={t.id} onClick={()=>setTab(t.id)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition flex-shrink-0"
-            style={{background:tab===t.id?'linear-gradient(135deg,#2563eb,#1d4ed8)':' rgba(255,255,255,0.04)',color:tab===t.id?'#fff':'rgba(255,255,255,0.55)',boxShadow:tab===t.id?'0 4px 16px rgba(37,99,235,0.25)':undefined,border:tab!==t.id?'1px solid rgba(255,255,255,0.07)':undefined}}>
+            style={{background:tab===t.id?'linear-gradient(135deg,#00875a,#00ae74)':' rgba(255,255,255,0.04)',color:tab===t.id?'#17125c':'rgba(255,255,255,0.45)',boxShadow:tab===t.id?'0 4px 16px rgba(0, 174, 116,0.22)':undefined,border:tab!==t.id?'1px solid rgba(255,255,255,0.07)':undefined}}>
             {t.emoji} {t.label}
           </button>
         ))}
       </div>
-
-      {/* NEWCOMERS (INTERVIEW CANDIDATES) */}
-      {tab==='newcomers'&&(
-        <div className="space-y-4">
-          <div className="rounded-2xl p-5" style={{background:'rgba(8,14,32,0.90)',border:'1px solid rgba(212,160,23,0.20)'}}>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-black text-white">🆕 Newcomer Interview Candidates</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Candidates who registered for a placement interview</p>
-              </div>
-              <div className="flex gap-2">
-                <span className="px-3 py-1.5 rounded-xl text-xs font-bold" style={{background:'rgba(212,160,23,0.10)',color:'#D4A017',border:'1px solid rgba(212,160,23,0.20)'}}>
-                  {newcomers.filter(n => n.status === 'waiting').length} Waiting
-                </span>
-                <span className="px-3 py-1.5 rounded-xl text-xs font-bold" style={{background:'rgba(52,211,153,0.10)',color:'#34d399',border:'1px solid rgba(52,211,153,0.20)'}}>
-                  {newcomers.filter(n => n.status === 'completed').length} Done
-                </span>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {newcomers.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-3xl mb-2">📭</p>
-                  <p className="text-sm text-gray-400 font-bold">No newcomers yet</p>
-                  <p className="text-xs text-gray-500">Candidates will appear here when they register for an interview</p>
-                </div>
-              ) : newcomers.map(nc => (
-                <div key={nc.id} className="rounded-2xl p-4 transition hover:bg-white/[0.03]"
-                  style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.06)'}}>
-                  <div className="flex items-center justify-between flex-wrap gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg flex-shrink-0"
-                        style={{background:nc.status==='waiting'?'rgba(212,160,23,0.12)':'rgba(52,211,153,0.12)',border:`2px solid ${nc.status==='waiting'?'rgba(212,160,23,0.25)':'rgba(52,211,153,0.25)'}`}}>
-                        {nc.status==='waiting'?'🕐':'✅'}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-white">{nc.firstName} {nc.lastName}</p>
-                        <p className="text-[11px] text-gray-400">{nc.gmail} · {nc.callPhone || nc.whatsappPhone || '—'}</p>
-                        <p className="text-[10px] text-gray-500">{nc.city}{nc.country ? `, ${nc.country}` : ''} · Age: {nc.age || '—'}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                        nc.status === 'waiting' ? 'text-golden-bright' :
-                        nc.status === 'in-interview' ? 'text-sky-400' :
-                        nc.status === 'completed' ? 'text-emerald-400' :
-                        'text-indigo-400'
-                      }`} style={{background:`${nc.status==='waiting'?'rgba(212,160,23,0.10)':nc.status==='in-interview'?'rgba(56,189,248,0.10)':nc.status==='completed'?'rgba(52,211,153,0.10)':'rgba(129,140,248,0.10)'}`,border:`1px solid ${nc.status==='waiting'?'rgba(212,160,23,0.20)':nc.status==='in-interview'?'rgba(56,189,248,0.20)':nc.status==='completed'?'rgba(52,211,153,0.20)':'rgba(129,140,248,0.20)'}`}}>
-                        {nc.status}
-                      </span>
-                      <button onClick={() => {
-                        setSelectedNewcomer(nc)
-                        updateNewcomerStatus(nc.id, 'in-interview')
-                        setInterviewMeeting(true)
-                        setNewcomers(prev => prev.map(n => n.id === nc.id ? {...n, status: 'in-interview'} : n))
-                      }}
-                        className="px-3 py-2 rounded-xl text-xs font-bold golden-gradient text-white transition"
-                        style={{boxShadow:'0 4px 12px rgba(212,160,23,0.25)'}}>
-                        🎥 Meet & Interview
-                      </button>
-                      {nc.status === 'completed' && (
-                        <span className="px-3 py-2 rounded-xl text-xs font-bold" style={{background:'rgba(52,211,153,0.12)',color:'#34d399',border:'1px solid rgba(52,211,153,0.20)'}}>
-                          ✅ Done
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* STUDENT RECORDS ARCHIVE — aggregated per-student records */}
-      {tab==='studentsrecords'&&<StudentRecordArchive/>}
 
       {/* FROM GOOGLE FORMS — full section under Academic Room control */}
       {tab==='googleforms'&&<GoogleFormsSection/>}
@@ -430,13 +263,8 @@ export function AcademicRoomPage() {
       {/* IN-CLASS ASSESSMENT MANAGEMENT */}
       {tab==='assessment'&&<AssessmentAdmin/>}
 
-      {/* TEACHER PERFORMANCE EVALUATION MANAGEMENT — moved to AI Teacher Eval Admin tab */}
-      {tab==='teachereval'&&(
-        <div style={{padding:32,textAlign:'center',color:'#64748b'}}>
-          <p style={{fontSize:16,marginBottom:8}}>{lang==='ar'?'تم نقل إدارة تقييم المعلمين إلى تبويب "الإدارة" في صفحة تقييم المعلم بالذكاء.':'Teacher Evaluation management has moved to the "Admin" tab in the AI Teacher Eval page.'}</p>
-          <p style={{fontSize:14}}>{lang==='ar'?'استخدم قائمة التنقل "تقييم المعلم بالذكاء" للوصول إليها.':'Use the "AI Teacher Eval" nav item to access it.'}</p>
-        </div>
-      )}
+      {/* TEACHER PERFORMANCE EVALUATION MANAGEMENT */}
+      {tab==='teachereval'&&<EvalAdmin/>}
 
       {/* OVERVIEW */}
       {tab==='overview'&&(
@@ -451,20 +279,20 @@ export function AcademicRoomPage() {
           ].map((stat,i)=>(
             <motion.div key={i} initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:i*0.07}}
               whileHover={{y:-3}} className="rounded-2xl p-5 cursor-default"
-              style={{background:'rgba(30,58,138,0.88)',border:`1px solid ${stat.color}22`,boxShadow:`0 4px 20px rgba(0,0,0,0.20)`}}
-              onMouseEnter={e=>(e.currentTarget as HTMLElement).style.boxShadow=`0 8px 28px ${stat.color}20`}
-              onMouseLeave={e=>(e.currentTarget as HTMLElement).style.boxShadow='0 4px 20px rgba(0,0,0,0.20)'}>
+              style={{background:'rgba(8,14,32,0.90)',border:`1px solid ${stat.color}18`,boxShadow:`0 4px 20px rgba(0,0,0,0.15)`}}
+              onMouseEnter={e=>(e.currentTarget as HTMLElement).style.boxShadow=`0 8px 28px ${stat.color}15`}
+              onMouseLeave={e=>(e.currentTarget as HTMLElement).style.boxShadow='0 4px 20px rgba(0,0,0,0.15)'}>
               <div className="flex items-start justify-between mb-3">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-                  style={{background:`${stat.color}15`,border:`1px solid ${stat.color}25`}}>{stat.icon}</div>
-                <button className="text-[10px] font-bold px-2.5 py-1 rounded-full transition"
-                  style={{background:`${stat.color}12`,color:stat.color,border:`1px solid ${stat.color}22`}}>
+                  style={{background:`${stat.color}12`,border:`1px solid ${stat.color}20`}}>{stat.icon}</div>
+                <button className="text-[10px] font-semibold px-2.5 py-1 rounded-full transition"
+                  style={{background:`${stat.color}10`,color:stat.color,border:`1px solid ${stat.color}20`}}>
                   {stat.action} →
                 </button>
               </div>
               <p className="text-3xl font-black mb-0.5" style={{color:stat.color}}>{stat.value}</p>
-              <p className="text-sm font-bold text-white">{stat.title}</p>
-              <p className="text-[10px] text-gray-300 mt-0.5" style={{fontFamily:'Tajawal,sans-serif'}}>{stat.titleAr}</p>
+              <p className="text-sm font-bold text-white/70">{stat.title}</p>
+              <p className="text-[10px] text-white/30 mt-0.5" style={{fontFamily:'Tajawal,sans-serif'}}>{stat.titleAr}</p>
             </motion.div>
           ))}
 
@@ -818,8 +646,8 @@ export function AcademicRoomPage() {
                   <span className="text-[9px] text-white/25">{t.uses} uses</span>
                 </div>
                 <div className="flex gap-1.5 mt-3">
-            <button className="flex-1 py-1.5 rounded-lg text-[10px] font-bold" style={{background:'rgba(212,160,23,0.15)',color:'#D4A017',border:'1px solid rgba(212,160,23,0.25)'}}>Use</button>
-            <button className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold" style={{background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.50)',border:'1px solid rgba(255,255,255,0.10)'}}>Edit</button>
+                  <button className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold" style={{background:'rgba(63, 186, 235,0.10)',color:'#93c5fd',border:'1px solid rgba(63, 186, 235,0.18)'}}>Use</button>
+                  <button className="flex-1 py-1.5 rounded-lg text-[10px] font-semibold" style={{background:'rgba(255,255,255,0.04)',color:'rgba(255,255,255,0.40)',border:'1px solid rgba(255,255,255,0.07)'}}>Edit</button>
                   <button onClick={()=>setScreenViewer({name:'Selected student',ctx:t.title})}
                     className="py-1.5 px-2 rounded-lg text-[10px] font-semibold transition"
                     style={{background:'rgba(124,58,237,0.12)',color:'#c4b5fd',border:'1px solid rgba(124,58,237,0.25)'}}
@@ -832,9 +660,13 @@ export function AcademicRoomPage() {
         </div>
       )}
 
-      {/* SCHEDULE — Quiz Scheduler */}
+      {/* SCHEDULE */}
       {tab==='schedule'&&(
-        <QuizScheduler />
+        <div className="rounded-2xl p-6 text-center" style={{background:'rgba(8,14,32,0.90)',border:'1px solid rgba(255,255,255,0.06)'}}>
+          <p className="text-5xl mb-4">📅</p>
+          <p className="text-lg font-black text-white/60">Academic Calendar</p>
+          <p className="text-sm text-white/30 mt-1">Full weekly/monthly class schedule with teacher assignments coming here.</p>
+        </div>
       )}
 
       {/* ARCHIVE */}
@@ -934,62 +766,64 @@ export function AcademicRoomPage() {
         )}
       </AnimatePresence>
 
-      {/* Floating meeting room — real WebRTC, 8-side resizable */}
+      {/* Floating meeting room */}
       <AnimatePresence>
-        {meetingActive && (
-          <WebRTCProvider>
-            <MeetingRoomWindow
-              studentName={selectedStudent?.name}
-              onClose={() => { setMeetingActive(false); setSelectedStudent(null) }}
-            />
-          </WebRTCProvider>
-        )}
-      </AnimatePresence>
-
-      {/* Interview meeting room with placement test control */}
-      <AnimatePresence>
-        {interviewMeeting && selectedNewcomer && (
-          <WebRTCProvider>
-            <MeetingRoomWindow
-              studentName={`${selectedNewcomer.firstName} ${selectedNewcomer.lastName}`}
-              isInterview={true}
-              isSupervisor={true}
-              interviewNewcomerId={selectedNewcomer.id}
-              onPlacementTestGranted={() => {
-                setPlacementTestActive(true)
-              }}
-              onClose={() => {
-                setInterviewMeeting(false)
-                setSelectedNewcomer(null)
-                setPlacementTestActive(false)
-              }}
-            />
-          </WebRTCProvider>
-        )}
-      </AnimatePresence>
-      {/* Placement test modal for interview */}
-      {placementTestActive && selectedNewcomer && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center"
-          style={{background:'rgba(2,6,15,0.85)',backdropFilter:'blur(4px)'}}>
-          <div className="w-full max-w-5xl max-h-[90vh] rounded-2xl overflow-hidden"
-            style={{background:'rgba(14,30,80,0.95)',border:'1px solid rgba(212,160,23,0.25)',boxShadow:'0 32px 64px rgba(0,0,0,0.6)'}}>
-            <div className="flex items-center justify-between px-5 py-3" style={{borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🎯</span>
-                <span className="text-sm font-bold text-white">Placement Test — {selectedNewcomer.firstName} {selectedNewcomer.lastName}</span>
+        {meetingActive&&(
+          <motion.div initial={{opacity:0,scale:0.85,y:40}} animate={{opacity:1,scale:1,y:0}} exit={{opacity:0,scale:0.85,y:40}}
+            className="fixed z-50 shadow-2xl rounded-2xl overflow-hidden"
+            style={{
+              bottom:meetingMinimized?'20px':'50%',right:'20px',
+              width:meetingMinimized?'220px':'480px',
+              height:meetingMinimized?'52px':'320px',
+              transform:meetingMinimized?undefined:'translateY(50%)',
+              background:'#1d1668',border:'1px solid rgba(52,211,153,0.35)',
+              boxShadow:'0 24px 64px rgba(0,0,0,0.60)',
+            }}>
+            {/* Meeting header */}
+            <div className="flex items-center gap-2 px-3 py-2.5 flex-shrink-0"
+              style={{background:'linear-gradient(135deg,rgba(5,150,105,0.25),rgba(16,185,129,0.15))',borderBottom:'1px solid rgba(52,211,153,0.15)'}}>
+              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black text-emerald-400 truncate">🎥 Academic Meeting Room</p>
+                {selectedStudent&&<p className="text-[9px] text-white/40 truncate">{selectedStudent.name}</p>}
               </div>
-              <button onClick={() => setPlacementTestActive(false)}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold transition"
-                style={{background:'rgba(239,68,68,0.12)',color:'#f87171',border:'1px solid rgba(239,68,68,0.25)'}}>
-                ✕ Close Test
-              </button>
+              <button onClick={()=>setMeetingMinimized(m=>!m)} className="text-white/40 hover:text-white transition text-xs">{meetingMinimized?'⬆':'⬇'}</button>
+              <button onClick={()=>{setMeetingActive(false);setSelectedStudent(null)}} className="text-white/40 hover:text-red-400 transition text-xs">✕</button>
             </div>
-            <div className="p-4 max-h-[calc(90vh-60px)] overflow-y-auto">
-              <PlacementsPage />
-            </div>
-          </div>
-        </div>
-      )}
+
+            {!meetingMinimized&&(
+              <div className="flex flex-col h-full">
+                {/* Video area */}
+                <div className="flex-1 relative" style={{background:'linear-gradient(135deg,#17125c,#241c80)'}}>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center">
+                      <p className="text-4xl mb-2">🎥</p>
+                      <p className="text-xs text-white/40">Camera feed · Academic interview room</p>
+                      {selectedStudent&&<p className="text-xs text-emerald-400 mt-1">{selectedStudent.name}</p>}
+                    </div>
+                  </div>
+                  {/* Local camera PiP */}
+                  <div className="absolute bottom-2 right-2 w-16 h-12 rounded-lg"
+                    style={{background:'rgba(0,0,0,0.5)',border:'1px solid rgba(255,255,255,0.10)'}}>
+                    <div className="w-full h-full flex items-center justify-center text-xl">👤</div>
+                  </div>
+                </div>
+                {/* Meeting controls */}
+                <div className="flex items-center justify-center gap-3 px-4 py-3 flex-shrink-0" style={{borderTop:'1px solid rgba(255,255,255,0.06)'}}>
+                  {[{icon:'🎙',label:'Mute'},{icon:'📷',label:'Camera'},{icon:'💬',label:'Chat'},{icon:'📋',label:'Notes'},{icon:'📞',label:'End',red:true}].map(btn=>(
+                    <button key={btn.label} title={btn.label}
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-sm transition hover:scale-110"
+                      style={{background:btn.red?'rgba(239,68,68,0.25)':'rgba(255,255,255,0.06)',border:`1px solid ${btn.red?'rgba(239,68,68,0.40)':'rgba(255,255,255,0.10)'}`}}
+                      onClick={()=>{if(btn.red){setMeetingActive(false);setSelectedStudent(null)}}}>
+                      {btn.icon}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Consent-gated student screen viewer */}
       <AnimatePresence>

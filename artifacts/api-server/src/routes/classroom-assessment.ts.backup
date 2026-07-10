@@ -1,0 +1,326 @@
+import { Router, Request, Response } from "express";
+import { db, appUsers, courses, teachers, students, parents, criteria, assessmentSheets, assessmentScores, reports, attendanceSheets, attendanceRows, classrooms, courseEnrollments } from "@workspace/db";
+import { eq, and, inArray, desc, sql } from "drizzle-orm";
+import { requireAuth } from "../lib/auth";
+import { logger } from "../lib/logger";
+
+const router = Router();
+
+function getReqUser(req: Request): { id: string; role: string; email: string; name: string } | null {
+  const u = (req as any).user;
+  if (!u) return null;
+  return { id: String(u.id), role: u.role, email: u.email, name: u.name };
+}
+
+function isStaff(role: string) {
+  return role === "admin" || role === "supervisor";
+}
+
+/* CLASSROOMS */
+router.get("/v1/classrooms", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user) return res.status(401).json({ message: "Unauthorized" });
+  try {
+    let rooms: any[] = [];
+    if (isStaff(user.role) || user.role === "teacher") {
+      rooms = await db.select().from(classrooms).orderBy(classrooms.id);
+    } else if (user.role === "student") {
+      const enrollments = await db.select({ classroomId: courseEnrollments.classroomId }).from(courseEnrollments).where(eq(courseEnrollments.studentId, user.id));
+      const classroomIds = enrollments.map(e => e.classroomId).filter(Boolean);
+      if (classroomIds.length > 0) {
+        rooms = await db.select().from(classrooms).where(inArray(classrooms.id, classroomIds as any)).orderBy(classrooms.id);
+      }
+    }
+    return res.json({ data: rooms });
+  } catch (err: any) {
+    logger.error("GET /v1/classrooms error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/v1/classrooms", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const { name, description, capacity, level, schedule } = req.body;
+    if (!name) return res.status(400).json({ message: "Name required" });
+    const [room] = await db.insert(classrooms).values({ name, description, capacity: capacity || 30, level, schedule }).returning();
+    return res.status(201).json({ data: room });
+  } catch (err: any) {
+    logger.error("POST /v1/classrooms error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.patch("/v1/classrooms/:id", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const { name, description, capacity, level, schedule } = req.body;
+    const [room] = await db.update(classrooms).set({ name, description, capacity, level, schedule, updatedAt: new Date() }).where(eq(classrooms.id, req.params.id)).returning();
+    if (!room) return res.status(404).json({ message: "Not found" });
+    return res.json({ data: room });
+  } catch (err: any) {
+    logger.error("PATCH /v1/classrooms error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.delete("/v1/classrooms/:id", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    await db.delete(classrooms).where(eq(classrooms.id, req.params.id));
+    return res.json({ message: "Deleted" });
+  } catch (err: any) {
+    logger.error("DELETE /v1/classrooms error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* COURSES */
+router.get("/v1/courses", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user) return res.status(401).json({ message: "Unauthorized" });
+  try {
+    let courseList: any[] = [];
+    if (isStaff(user.role)) {
+      courseList = await db.select().from(courses).orderBy(courses.id);
+    } else if (user.role === "teacher") {
+      const teacherRecord = await db.select().from(teachers).where(eq(teachers.userId, user.id)).limit(1);
+      if (teacherRecord.length > 0) {
+        courseList = await db.select().from(courses).where(eq(courses.teacherId, teacherRecord[0].id)).orderBy(courses.id);
+      }
+    } else if (user.role === "student") {
+      const enrollments = await db.select({ courseId: courseEnrollments.courseId }).from(courseEnrollments).where(eq(courseEnrollments.studentId, user.id));
+      const courseIds = enrollments.map(e => e.courseId).filter(Boolean);
+      if (courseIds.length > 0) {
+        courseList = await db.select().from(courses).where(inArray(courses.id, courseIds as any)).orderBy(courses.id);
+      }
+    }
+    return res.json({ data: courseList });
+  } catch (err: any) {
+    logger.error("GET /v1/courses error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/v1/courses", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || (!isStaff(user.role) && user.role !== "teacher")) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const { name, description, classroomId, teacherId, level, schedule } = req.body;
+    if (!name) return res.status(400).json({ message: "Name required" });
+    const [course] = await db.insert(courses).values({ name, description, classroomId, teacherId, level, schedule }).returning();
+    return res.status(201).json({ data: course });
+  } catch (err: any) {
+    logger.error("POST /v1/courses error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* TEACHERS */
+router.get("/v1/classroom-assessment/teachers", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const list = await db.select().from(teachers).orderBy(teachers.id);
+    return res.json({ data: list });
+  } catch (err: any) {
+    logger.error("GET teachers error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* STUDENTS */
+router.get("/v1/classroom-assessment/students", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const list = await db.select().from(students).orderBy(students.id);
+    return res.json({ data: list });
+  } catch (err: any) {
+    logger.error("GET students error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* PARENTS */
+router.get("/v1/classroom-assessment/parents", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const list = await db.select().from(parents).orderBy(parents.id);
+    return res.json({ data: list });
+  } catch (err: any) {
+    logger.error("GET parents error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* ENROLLMENTS */
+router.post("/v1/enrollments", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const { studentId, courseId, classroomId } = req.body;
+    if (!studentId || !courseId) return res.status(400).json({ message: "studentId and courseId required" });
+    const [enrollment] = await db.insert(courseEnrollments).values({ studentId, courseId, classroomId, enrolledAt: new Date() }).returning();
+    return res.status(201).json({ data: enrollment });
+  } catch (err: any) {
+    logger.error("POST enrollments error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.get("/v1/enrollments/:studentId", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user) return res.status(401).json({ message: "Unauthorized" });
+  if (user.role === "student" && user.id !== req.params.studentId) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const list = await db.select().from(courseEnrollments).where(eq(courseEnrollments.studentId, req.params.studentId));
+    return res.json({ data: list });
+  } catch (err: any) {
+    logger.error("GET enrollments error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* ASSESSMENT SHEETS */
+router.get("/v1/classroom-assessment/assessment-sheets", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const list = await db.select().from(assessmentSheets).orderBy(desc(assessmentSheets.createdAt));
+    return res.json({ data: list });
+  } catch (err: any) {
+    logger.error("GET assessment-sheets error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/v1/classroom-assessment/assessment-sheets", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const { name, courseId, criteriaIds } = req.body;
+    const [sheet] = await db.insert(assessmentSheets).values({ name, courseId, criteriaIds }).returning();
+    return res.status(201).json({ data: sheet });
+  } catch (err: any) {
+    logger.error("POST assessment-sheets error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* CRITERIA */
+router.get("/v1/classroom-assessment/criteria", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const list = await db.select().from(criteria).orderBy(criteria.id);
+    return res.json({ data: list });
+  } catch (err: any) {
+    logger.error("GET criteria error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/v1/classroom-assessment/criteria", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const { name, description, maxScore } = req.body;
+    const [item] = await db.insert(criteria).values({ name, description, maxScore: maxScore || 100 }).returning();
+    return res.status(201).json({ data: item });
+  } catch (err: any) {
+    logger.error("POST criteria error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* ATTENDANCE */
+router.get("/v1/classroom-assessment/attendance", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const list = await db.select().from(attendanceSheets).orderBy(desc(attendanceSheets.date));
+    return res.json({ data: list });
+  } catch (err: any) {
+    logger.error("GET attendance error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/v1/classroom-assessment/attendance", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const { courseId, date, rows } = req.body;
+    const [sheet] = await db.insert(attendanceSheets).values({ courseId, date: new Date(date) }).returning();
+    if (rows && Array.isArray(rows)) {
+      for (const row of rows) {
+        await db.insert(attendanceRows).values({ sheetId: sheet.id, studentId: row.studentId, status: row.status, note: row.note });
+      }
+    }
+    return res.status(201).json({ data: sheet });
+  } catch (err: any) {
+    logger.error("POST attendance error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* REPORTS */
+router.get("/v1/classroom-assessment/reports", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const list = await db.select().from(reports).orderBy(desc(reports.createdAt));
+    return res.json({ data: list });
+  } catch (err: any) {
+    logger.error("GET reports error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/v1/classroom-assessment/reports", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const { studentId, courseId, content, period } = req.body;
+    const [report] = await db.insert(reports).values({ studentId, courseId, content, period, createdBy: user.id }).returning();
+    return res.status(201).json({ data: report });
+  } catch (err: any) {
+    logger.error("POST reports error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+/* USERS MANAGE */
+router.get("/v1/users", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const list = await db.select().from(appUsers).orderBy(appUsers.id);
+    return res.json({ data: list });
+  } catch (err: any) {
+    logger.error("GET users error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.patch("/v1/users/:id/role", requireAuth, async (req, res) => {
+  const user = getReqUser(req);
+  if (!user || !isStaff(user.role)) return res.status(403).json({ message: "Forbidden" });
+  try {
+    const { role } = req.body;
+    if (!role) return res.status(400).json({ message: "Role required" });
+    const [updated] = await db.update(appUsers).set({ role, updatedAt: new Date() }).where(eq(appUsers.id, req.params.id)).returning();
+    if (!updated) return res.status(404).json({ message: "Not found" });
+    return res.json({ data: updated });
+  } catch (err: any) {
+    logger.error("PATCH users/role error: " + err.message);
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+export default router;

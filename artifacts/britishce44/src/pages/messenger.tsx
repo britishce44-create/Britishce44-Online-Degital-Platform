@@ -1,13 +1,55 @@
 
-import { useState, useRef, useEffect, KeyboardEvent } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback, KeyboardEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { apiGet, type Message as ApiMessage } from '@/lib/api'
+import { apiGet, apiPost, ApiError, type Message as ApiMessage } from '@/lib/api'
+import toast from 'react-hot-toast'
 
 /* ── types ─────────────────────────────────────────── */
 interface Message { id:string; sender:string; text:string; time:string; mine:boolean; read?:boolean; channel?:string }
-interface Contact  { id:string; name:string; role:string; online:boolean; unread?:number; lastMsg?:string; lastTime?:string; phone?:string; group?:string; pinned?:boolean; folder?:string }
+interface Contact  {
+  id: string
+  name: string
+  role: string
+  online: boolean
+  unread?: number
+  lastMsg?: string
+  lastTime?: string
+  phone?: string
+  email?: string
+  group?: string
+  pinned?: boolean
+  folder?: string
+  classification?: string
+  contactId?: number
+}
 interface Group    { id:string; name:string; color:string; contacts:string[] }
 interface Folder   { id:string; name:string; emoji:string; color:string; groups:string[] }
+
+interface ContactApi {
+  id: number
+  name: string
+  phone: string
+  email: string
+  groupIds: number[]
+  classification: string
+  notes: string
+}
+
+interface ContactGroupApi {
+  id: number
+  name: string
+  color: string
+}
+
+interface ContactMessageApi {
+  id: number
+  channel: string
+  direction: 'sent' | 'received'
+  content: string
+  status: string
+  senderInfo: string
+  createdAt: string
+}
 
 const ROLE_COLORS: Record<string,string> = {admin:'#00ae74',teacher:'#3b82f6',student:'#38bdf8',supervisor:'#34d399',parent:'#fb923c'}
 
@@ -50,6 +92,81 @@ const CHANNELS = [
   {id:'call',icon:'📞',label:'Voice Call',color:'#00ae74'},
 ]
 
+const DEFAULT_FOLDERS: Folder[] = [
+  { id: 'f-all', name: 'Staff', emoji: '👥', color: '#60a5fa', groups: [] },
+  { id: 'f-students', name: 'Students', emoji: '🎓', color: '#38bdf8', groups: [] },
+]
+
+function roleFromClassification(classification?: string) {
+  const value = (classification || '').toLowerCase()
+  if (value.includes('teacher') || value.includes('staff') || value.includes('admin')) return 'teacher'
+  if (value.includes('parent')) return 'parent'
+  if (value.includes('supervisor')) return 'supervisor'
+  return 'student'
+}
+
+function folderFromClassification(classification?: string) {
+  const value = (classification || '').toLowerCase()
+  if (value.includes('teacher') || value.includes('staff') || value.includes('admin')) return 'staff'
+  if (value.includes('parent')) return 'parents'
+  return 'students'
+}
+
+function formatMessageTime(dateStr: string) {
+  return new Date(dateStr).toLocaleString('en', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function mapContactsFromApi(contacts: ContactApi[], groups: ContactGroupApi[]): Contact[] {
+  const groupMap = new Map(groups.map(g => [g.id, g]))
+  return contacts.map((c) => {
+    const role = roleFromClassification(c.classification)
+    const folder = folderFromClassification(c.classification)
+    const primaryGroup = c.groupIds?.[0]
+    return {
+      id: String(c.id),
+      name: c.name,
+      role,
+      online: role === 'teacher' || role === 'admin',
+      phone: c.phone || undefined,
+      email: c.email || undefined,
+      group: primaryGroup ? groupMap.get(primaryGroup)?.name : undefined,
+      folder,
+      classification: c.classification,
+      contactId: c.id,
+      unread: 0,
+      lastMsg: '',
+      lastTime: '',
+    }
+  })
+}
+
+function mapGroupsFromApi(groups: ContactGroupApi[], contacts: Contact[]): Group[] {
+  return groups.map(g => ({
+    id: `g${g.id}`,
+    name: g.name,
+    color: g.color || '#60a5fa',
+    contacts: contacts.filter(c => c.group === g.name).map(c => c.id),
+  }))
+}
+
+function buildFolders(groups: Group[]): Folder[] {
+  if (!groups.length) return DEFAULT_FOLDERS
+  return [{ id: 'f-all', name: 'All Contacts', emoji: '👥', color: '#60a5fa', groups: groups.map(g => g.id) }]
+}
+
+function mapContactMessages(entries: ContactMessageApi[], name: string): Message[] {
+  if (!entries.length) return []
+  return entries.map(msg => ({
+    id: `api-${msg.id}`,
+    sender: msg.direction === 'sent' ? 'You' : name,
+    text: msg.content,
+    time: formatMessageTime(msg.createdAt),
+    mine: msg.direction === 'sent',
+    read: true,
+    channel: msg.channel,
+  }))
+}
+
 function AvatarCircle({name,role,size='md',online}:{name:string;role:string;size?:'sm'|'md'|'lg';online?:boolean}) {
   const col=ROLE_COLORS[role]||'#6b7280'
   const sz={sm:'w-7 h-7 text-[10px]',md:'w-9 h-9 text-xs',lg:'w-11 h-11 text-sm'}
@@ -66,10 +183,10 @@ function AvatarCircle({name,role,size='md',online}:{name:string;role:string;size
 
 export function MessengerPage() {
   const [contacts,setContacts]=useState<Contact[]>(INIT_CONTACTS)
-  const [groups]=useState<Group[]>(INIT_GROUPS)
-  const [folders,setFolders]=useState<Folder[]>(INIT_FOLDERS)
-  const [messages,setMessages]=useState(INIT_MSGS)
-  const [activeId,setActiveId]=useState<string|null>('2')
+  const [groups,setGroups]=useState<Group[]>(INIT_GROUPS)
+  const [folders,setFolders]=useState<Folder[]>(DEFAULT_FOLDERS)
+  const [messages,setMessages]=useState<Record<string,Message[]>>(INIT_MSGS)
+  const [activeId,setActiveId]=useState<string|null>(INIT_CONTACTS[0]?.id ?? null)
   const [input,setInput]=useState('')
   const [channel,setChannel]=useState('platform')
   const [tab,setTab]=useState<'chats'|'contacts'|'groups'|'online'|'broadcast'>('chats')
@@ -80,8 +197,51 @@ export function MessengerPage() {
   const [broadcastTargets,setBroadcastTargets]=useState<string[]>([])
   const [broadcastSent,setBroadcastSent]=useState(false)
   const [pinnedIds,setPinnedIds]=useState<string[]>(['1','5'])
+  const [contactsLoading,setContactsLoading]=useState(true)
+  const [messagesLoading,setMessagesLoading]=useState(false)
+  const [contactsError,setContactsError]=useState<string|null>(null)
   const msgEndRef=useRef<HTMLDivElement>(null)
   const [newContact,setNewContact]=useState({name:'',role:'student',phone:'',email:'',group:'',folder:'students'})
+  const [systemContact,setSystemContact]=useState<Contact | null>(null)
+
+  const loadContacts = useCallback(async () => {
+    setContactsLoading(true)
+    setContactsError(null)
+    try {
+      const [contactsRes, groupsRes] = await Promise.all([
+        apiGet<{ contacts: ContactApi[] }>('/contacts'),
+        apiGet<{ groups: ContactGroupApi[] }>('/contacts/groups'),
+      ])
+      const mappedContacts = mapContactsFromApi(contactsRes.contacts, groupsRes.groups)
+      const mappedGroups = mapGroupsFromApi(groupsRes.groups, mappedContacts)
+      const baseContacts = mappedContacts.length ? mappedContacts : INIT_CONTACTS
+      const finalContacts = systemContact && !baseContacts.some(c => c.id === systemContact.id)
+        ? [systemContact, ...baseContacts]
+        : baseContacts
+      setContacts(finalContacts)
+      const finalGroups = mappedGroups.length ? mappedGroups : INIT_GROUPS
+      setGroups(finalGroups)
+      setFolders(buildFolders(finalGroups))
+      setActiveId(cur => {
+        if (mappedContacts.length === 0) return cur
+        if (cur && mappedContacts.some(c => c.id === cur)) return cur
+        return mappedContacts[0].id
+      })
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Unable to load contacts'
+      setContactsError(message)
+      const fallbackContacts = systemContact && !INIT_CONTACTS.some(c => c.id === systemContact.id)
+        ? [systemContact, ...INIT_CONTACTS]
+        : INIT_CONTACTS
+      setContacts(fallbackContacts)
+      setGroups(INIT_GROUPS)
+      setFolders(DEFAULT_FOLDERS)
+    } finally {
+      setContactsLoading(false)
+    }
+  }, [systemContact])
+
+  useEffect(() => { loadContacts() }, [loadContacts])
 
   useEffect(()=>{msgEndRef.current?.scrollIntoView({behavior:'smooth'})},[activeId,messages])
 
@@ -91,10 +251,25 @@ export function MessengerPage() {
       if(!d.messages.length)return
       const mapped:Message[]=d.messages.map(m=>({id:`s${m.id}`,sender:m.fromName,text:m.body,time:new Date(m.createdAt).toLocaleString('en',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}),mine:false,read:true,channel:'platform'}))
       setMessages(prev=>({...prev,sys:mapped}))
-      setContacts(prev=>prev.some(c=>c.id==='sys')?prev:[{id:'sys',name:'CE4 System',role:'admin',online:true,unread:0,lastMsg:mapped[mapped.length-1]?.text.slice(0,32),lastTime:'now',group:'Management',pinned:true,folder:'staff'},...prev])
+      const sysContact:Contact={id:'sys',name:'CE4 System',role:'admin',online:true,unread:0,lastMsg:mapped[mapped.length-1]?.text.slice(0,32),lastTime:'now',group:'Management',pinned:true,folder:'staff'}
+      setContacts(prev=>prev.some(c=>c.id==='sys')?prev:[sysContact,...prev])
+      setSystemContact(sysContact)
       setPinnedIds(prev=>prev.includes('sys')?prev:['sys',...prev])
     }).catch(()=>{})
   },[])
+
+  useEffect(() => {
+    if (!activeId) return
+    if (activeId === 'sys') return
+    const contact = contacts.find(c => c.id === activeId)
+    if (!contact?.contactId) return
+    if (messages[activeId]?.some(m => m.id.startsWith('api-'))) return
+    setMessagesLoading(true)
+    apiGet<{ messages: ContactMessageApi[] }>(`/contacts/${contact.contactId}/messages`).then(res => {
+      if (!res.messages.length) return
+      setMessages(prev => ({ ...prev, [contact.id]: mapContactMessages(res.messages, contact.name) }))
+    }).catch(() => {}).finally(() => setMessagesLoading(false))
+  }, [activeId, contacts, messages])
 
   const activeContact=contacts.find(c=>c.id===activeId)
   const currentMsgs=activeId?messages[activeId]||[]:[]
@@ -102,23 +277,47 @@ export function MessengerPage() {
   const onlineContacts=contacts.filter(c=>c.online)
   const pinned=contacts.filter(c=>pinnedIds.includes(c.id))
 
-  const sendMsg=()=>{
+  const sendMsg = useCallback(async () => {
     if(!input.trim()||!activeId)return
-    const nm:Message={id:`m${Date.now()}`,sender:'You',text:input.trim(),time:new Date().toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}),mine:true,read:false,channel}
-    setMessages(m=>({...m,[activeId]:[...(m[activeId]||[]),nm]}))
+    const contact = contacts.find(c => c.id === activeId)
+    if(!contact?.contactId){ toast.error('Select a contact'); return }
+    const text = input.trim()
+    const optimistic:Message={id:`tmp-${Date.now()}`,sender:'You',text,time:new Date().toLocaleTimeString('en',{hour:'2-digit',minute:'2-digit'}),mine:true,read:false,channel}
+    setMessages(m=>({...m,[activeId]:[...(m[activeId]||[]),optimistic]}))
     setInput('')
-  }
-  const handleKey=(e:KeyboardEvent)=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMsg()}}
+    try{
+      await apiPost('/contacts/send',{ contactId:contact.contactId, channel, content:text })
+      const history = await apiGet<{ messages: ContactMessageApi[] }>(`/contacts/${contact.contactId}/messages`)
+      setMessages(prev=>({...prev,[contact.id]:mapContactMessages(history.messages,contact.name)}))
+      const label = CHANNELS.find(c=>c.id===channel)?.label ?? 'Messenger'
+      toast.success(`Sent via ${label}`)
+    }catch(err){
+      toast.error(err instanceof ApiError ? err.message : 'Failed to send message')
+    }
+  },[input, activeId, contacts, channel])
+  const handleKey=(e:KeyboardEvent)=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void sendMsg()}}
   const togglePin=(id:string)=>setPinnedIds(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id])
   const sendBroadcast=()=>{if(!broadcastMsg.trim()||!broadcastTargets.length)return;setBroadcastSent(true);setTimeout(()=>setBroadcastSent(false),3000);setBroadcastMsg('')}
 
-  const addContact=()=>{
-    if(!newContact.name)return
-    const nc:Contact={id:String(Date.now()),name:newContact.name,role:newContact.role,online:false,lastMsg:'New contact',lastTime:'Now',phone:newContact.phone,group:newContact.group,folder:newContact.folder}
-    setContacts(p=>[...p,nc])
-    setShowAddContact(false)
-    setNewContact({name:'',role:'student',phone:'',email:'',group:'',folder:'students'})
-  }
+  const addContact=useCallback(async()=>{
+    if(!newContact.name.trim()){ toast.error('Name required'); return }
+    try{
+      await apiPost('/contacts',{
+        name:newContact.name.trim(),
+        phone:newContact.phone,
+        email:newContact.email,
+        classification:newContact.role.charAt(0).toUpperCase()+newContact.role.slice(1),
+        groupIds:[],
+        notes:'',
+      })
+      toast.success('Contact added')
+      setShowAddContact(false)
+      setNewContact({name:'',role:'student',phone:'',email:'',group:'',folder:'students'})
+      loadContacts()
+    }catch(err){
+      toast.error(err instanceof ApiError ? err.message : 'Failed to add contact')
+    }
+  },[newContact, loadContacts])
 
   const inpCls="w-full rounded-xl px-3 py-2 text-sm text-[#150d79] outline-none bg-[#f1f5f9] border border-slate-200 focus:border-[#3FBAEB] placeholder-slate-400 transition"
   const activeChan=CHANNELS.find(c=>c.id===channel)
@@ -140,6 +339,8 @@ export function MessengerPage() {
           <input value={searchQ} onChange={e=>setSearchQ(e.target.value)} placeholder="🔍 Search…"
             className="w-full px-3 py-2 rounded-xl text-xs outline-none placeholder-slate-400"
             style={{background:'#f1f5f9',border:'1px solid #e2e8f0',color:'#150d79'}} />
+          {contactsLoading && <p className="text-[10px] text-slate-400 mt-2">Syncing contacts…</p>}
+          {contactsError && <p className="text-[10px] text-amber-500 mt-2">⚠ {contactsError}</p>}
 
           {/* Tabs */}
           <div className="flex gap-1 mt-3">
@@ -294,7 +495,7 @@ export function MessengerPage() {
               <p className="text-[9px] text-slate-500">Select recipients, choose channel, write message, send.</p>
               <div>
                 <p className="text-[9px] uppercase tracking-widest text-slate-400 mb-1.5">Select Recipients</p>
-                {contacts.map(c=>(
+                {contacts.filter(c=>c.id!=='sys').map(c=>(
                   <div key={c.id} className="flex items-center gap-2 py-1.5 cursor-pointer" onClick={()=>setBroadcastTargets(t=>t.includes(c.id)?t.filter(x=>x!==c.id):[...t,c.id])}>
                     <div className={`w-3.5 h-3.5 rounded flex items-center justify-center flex-shrink-0`}
                       style={{background:broadcastTargets.includes(c.id)?'#3b82f6':'#f1f5f9',border:`1px solid ${broadcastTargets.includes(c.id)?'#3b82f6':'#cbd5e1'}`}}>
@@ -354,6 +555,9 @@ export function MessengerPage() {
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+              {messagesLoading && (
+                <div className="text-center text-[11px] text-slate-400">Loading history…</div>
+              )}
               {currentMsgs.map(m=>(
                 <div key={m.id} className={`flex ${m.mine?'justify-end':'justify-start'}`}>
                   {!m.mine&&<AvatarCircle name={activeContact.name} role={activeContact.role} size="sm" />}

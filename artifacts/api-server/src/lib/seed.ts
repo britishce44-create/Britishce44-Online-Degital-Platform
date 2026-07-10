@@ -33,7 +33,6 @@ const CRITERIA = [
 ];
 
 const TERM_LABEL = "Term 3 — 2026";
-const WEEKDAYS = [0, 1, 2, 3, 4]; // Sun–Thu
 
 // Plus-addressed Gmail so every demo report is delivered to the authorized
 // britishce44@gmail.com inbox while staying a distinct recipient address.
@@ -474,8 +473,6 @@ const SEED_COURSE_DEFS = [
   { name: "English A1", level: "A1", room: "Room G", startTime: "08:00", endTime: "09:30" },
   { name: "Grammar Workshop", level: "B1", room: "Room H", startTime: "09:45", endTime: "11:15" },
 ];
-
-const WEEKDAYS = [0, 1, 2, 3, 4]; // Sun–Thu
 
 export async function seedClassrooms(): Promise<void> {
   const allTeachers = await db.select().from(teachers).orderBy(teachers.id);

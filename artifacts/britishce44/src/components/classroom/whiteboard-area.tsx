@@ -1,7 +1,6 @@
 
 import { useRef, useState, useEffect, useCallback } from 'react'
 import * as fabric from 'fabric'
-import { WhiteboardToolbox } from './whiteboard-toolbox'
 
 type Tool =
   | 'select' | 'pen' | 'highlighter' | 'line' | 'arrow'
@@ -52,7 +51,6 @@ export function WhiteboardArea({ onSyncDraw, lang = 'en' }: WhiteboardAreaProps)
   const [pageIndex, setPageIndex] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
 
-  const [showToolbox, setShowToolbox] = useState(false)
   const [pinnedSide, setPinnedSide] = useState<Position | null>(null)
   const [chatMsg, setChatMsg] = useState('')
   const [wbChat, setWbChat] = useState<{ sender: string; text: string }[]>([])
@@ -742,11 +740,6 @@ export function WhiteboardArea({ onSyncDraw, lang = 'en' }: WhiteboardAreaProps)
           <button onClick={() => setPinnedSide(pinnedSide === 'chat' ? null : 'chat')} title="Whiteboard chat"
             className={`${btnBase} ${pinnedSide === 'chat' ? 'bg-gold/20 text-navy' : 'hover:bg-gray-200 text-gray-600'}`}>💬</button>
 
-          <button onClick={() => setShowToolbox(t => !t)} title="Open floating toolbox (text & object tools)"
-            className={`${btnBase} ${showToolbox ? 'bg-gold/20 text-navy border border-gold/30' : 'hover:bg-gray-200 text-gray-600'}`}>
-            🧰 <span className="hidden lg:inline">Toolbox</span>
-          </button>
-
           {/* AI cluster */}
           <div className="ml-auto flex items-center gap-1" dir={lang === 'ar' ? 'rtl' : undefined}>
             {aiActions.map(a => (
@@ -761,15 +754,6 @@ export function WhiteboardArea({ onSyncDraw, lang = 'en' }: WhiteboardAreaProps)
         {/* ── Canvas ── */}
         <div ref={wrapRef} className="flex-1 relative bg-gray-100">
           <canvas ref={canvasRef} className="absolute inset-0" />
-
-          {/* ── Floating Toolbox ── */}
-          {showToolbox && (
-            <WhiteboardToolbox
-              fabricRef={fabricRef}
-              onPushHistory={pushHistory}
-              onClose={() => setShowToolbox(false)}
-            />
-          )}
 
           {/* AI result overlay */}
           {aiOpen && (

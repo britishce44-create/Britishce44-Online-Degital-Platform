@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Teacher Evaluation Studio</title>
+    <style>
+      :root {
+        --navy: #0a2647;
+        --navy-deep: #061a2d;
+        --blue: #2563eb;
+        --gold: #c9a84c;
+        --gold-soft: #f4d98d;
+        --cream: #fcfbf6;
+        --text: #14213d;
+        --muted: #64748b;
+        --border: #e9e0cc;
+        --success: #0f766e;
+        --shadow: 0 16px 48px rgba(6, 26, 45, 0.12);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(145deg, #f7f1e0 0%, #fbfaf6 40%, #f5efe2 100%);
+        color: var(--text);
+        padding: 20px;
+      }
+      .shell {
+        max-width: 1400px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 24px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+        border: 1px solid rgba(201, 168, 76, 0.18);
+      }
+      .hero {
+        background: linear-gradient(135deg, var(--navy-deep) 0%, var(--navy) 45%, var(--blue) 100%);
+        color: white;
+        padding: 24px 28px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        border-bottom: 4px solid var(--gold);
+      }
+      .hero h1 { margin: 0 0 6px; font-size: 1.5rem; }
+      .hero p { margin: 0; color: rgba(255,255,255,0.78); max-width: 760px; }
+      .pill {
+        padding: 8px 14px;
+        background: rgba(255,255,255,0.12);
+        border: 1px solid rgba(255,255,255,0.18);
+        border-radius: 999px;
+        font-size: 0.84rem;
+        font-weight: 600;
+      }
+      .content { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 20px; padding: 22px; }
+      .card {
+        background: var(--cream);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 18px;
+        box-shadow: 0 8px 28px rgba(6, 26, 45, 0.05);
+      }
+      .card h2, .card h3 { margin-top: 0; color: var(--navy); }
+      .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 10px; }
+      label { display: block; font-size: 0.86rem; font-weight: 700; margin-bottom: 6px; color: var(--navy); }
+      input, select, textarea {
+        width: 100%; padding: 10px 12px; border: 1px solid #d9ccaf; border-radius: 10px; font-size: 0.92rem; background: white; color: var(--text);
+      }
+      textarea { min-height: 80px; resize: vertical; }
+      .criteria-list { display: grid; gap: 10px; margin-top: 14px; }
+      .criterion-item {
+        background: white; border: 1px solid #efe1bf; border-radius: 12px; padding: 10px 12px;
+      }
+      .criterion-top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-size: 0.9rem; font-weight: 700; color: var(--navy); }
+      .score-row { display: flex; align-items: center; gap: 10px; }
+      .score-row input[type="range"] { flex: 1; accent-color: var(--blue); }
+      .score-pill {
+        min-width: 42px; text-align: center; padding: 6px 10px; border-radius: 999px; background: rgba(37,99,235,0.12); color: var(--blue); font-weight: 700; font-size: 0.84rem;
+      }
+      .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+      button {
+        border: none; border-radius: 999px; padding: 10px 16px; font-weight: 700; cursor: pointer; transition: transform .2s ease, box-shadow .2s ease;
+      }
+      button:hover { transform: translateY(-1px); }
+      .btn-primary { background: linear-gradient(135deg, var(--blue), #1d4ed8); color: white; box-shadow: 0 10px 20px rgba(37,99,235,0.18); }
+      .btn-gold { background: linear-gradient(135deg, var(--gold), #e0b94a); color: var(--navy-deep); }
+      .btn-secondary { background: white; color: var(--navy); border: 1px solid var(--border); }
+      .summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0 16px; }
+      .summary-box { background: white; border: 1px solid #eee2c5; border-radius: 12px; padding: 12px; }
+      .summary-box strong { display: block; font-size: 1.1rem; color: var(--navy); }
+      .toggle-group { display: inline-flex; gap: 6px; margin-bottom: 12px; padding: 4px; background: #f3eedf; border-radius: 999px; }
+      .toggle-group button { padding: 8px 12px; border-radius: 999px; font-size: 0.82rem; background: transparent; color: var(--muted); }
+      .toggle-group button.active { background: var(--blue); color: white; }
+      .notice { font-size: 0.86rem; color: var(--muted); margin-bottom: 10px; }
+      .preview { padding: 18px; background: white; border: 1px solid #efe1bf; border-radius: 16px; min-height: 240px; }
+      .report-head { border-bottom: 2px solid #e5d8b3; padding-bottom: 10px; margin-bottom: 10px; }
+      .report-title { color: var(--navy); margin: 4px 0 0; font-size: 1.2rem; }
+      .badge { display: inline-block; padding: 6px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; }
+      .badge-weak { background: #fde8e8; color: #b91c1c; }
+      .badge-dev { background: #fef3c7; color: #92400e; }
+      .badge-strong { background: #dcfce7; color: #166534; }
+      .footer-line { border-top: 1px solid #e8debf; margin-top: 20px; padding-top: 14px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 0.9rem; }
+      @media (max-width: 980px) { .content { grid-template-columns: 1fr; } }
+      @media (max-width: 620px) { .row, .summary-grid { grid-template-columns: 1fr; } }
+      @media print { body { background: white; padding: 0; } .shell { box-shadow: none; border: none; } .no-print { display: none !important; } }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="hero">
+        <div>
+          <h1>AI Teacher Evaluation Studio</h1>
+          <p>Safe, local assessment workspace with white, blue, and gold styling, Arabic/English support, and two professional report versions.</p>
+        </div>
+        <div class="pill">No backend required • Local only</div>
+      </div>
+
+      <div class="content">
+        <div class="card">
+          <h2>Evaluation Form</h2>
+          <div class="row no-print">
+            <div>
+              <label for="teacherName">Teacher Name</label>
+              <input id="teacherName" placeholder="Enter teacher name" />
+            </div>
+            <div>
+              <label for="evalDate">Evaluation Date</label>
+              <input id="evalDate" type="date" />
+            </div>
+          </div>
+          <div class="row no-print">
+            <div>
+              <label for="courses">Current Courses</label>
+              <input id="courses" placeholder="e.g. English B1, IELTS Prep" />
+            </div>
+            <div>
+              <label for="history">Course History</label>
+              <input id="history" placeholder="Previous terms / experience" />
+            </div>
+          </div>
+
+          <div class="toggle-group no-print" role="tablist" aria-label="Report language">
+            <button class="active" data-lang="en" onclick="setLanguage('en')">English</button>
+            <button data-lang="ar" onclick="setLanguage('ar')">العربية</button>
+          </div>
+          <div class="toggle-group no-print" role="tablist" aria-label="Report version">
+            <button class="active" data-report="mixed" onclick="setReportType('mixed')">Arabic body • English header/footer</button>
+            <button data-report="english" onclick="setReportType('english')">Full English</button>
+          </div>
+
+          <div class="notice no-print">Scoring is local and does not affect any other platform section.</div>
+          <div id="criterionList" class="criteria-list"></div>
+          <div class="actions no-print">
+            <button class="btn-primary" onclick="generateReport()">Generate AI Feedback</button>
+            <button class="btn-gold" onclick="printReport()">Print / Save PDF</button>
+            <button class="btn-secondary" onclick="downloadHtml()">Download HTML Report</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Live Summary</h2>
+          <div class="summary-grid">
+            <div class="summary-box"><span id="summaryScoreLabel">Overall Score</span><strong id="summaryScore">0 / 75</strong></div>
+            <div class="summary-box"><span id="summaryPercentLabel">Overall %</span><strong id="summaryPercent">0%</strong></div>
+            <div class="summary-box"><span id="summaryLevelLabel">Performance Level</span><strong id="summaryLevel">Pending</strong></div>
+          </div>
+          <div class="preview" id="previewBox">
+            <div class="report-head">
+              <div style="font-size:0.9rem;color:var(--muted);">The First British Center</div>
+              <div class="report-title">AI Teacher Evaluation Report</div>
+            </div>
+            <p>Choose a report version to see the preview here.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const criteria = [
+        { id: 1, en: 'Strategy', ar: 'الاستراتيجية' },
+        { id: 2, en: 'Lesson Organisation', ar: 'تنظيم الدرس' },
+        { id: 3, en: 'Tasks and Activities', ar: 'المهام والأنشطة' },
+        { id: 4, en: 'Classroom Language', ar: 'لغة الفصل' },
+        { id: 5, en: 'Classroom Management', ar: 'إدارة الفصل' },
+        { id: 6, en: 'Atmosphere', ar: 'الجو العام' },
+        { id: 7, en: 'Tools and Engagement', ar: 'الأدوات والتفاعل' },
+        { id: 8, en: 'Whiteboard Use', ar: 'استخدام السبورة' },
+        { id: 9, en: 'Appearance', ar: 'المظهر' },
+        { id: 10, en: 'Language Accuracy', ar: 'دقة اللغة' },
+        { id: 11, en: 'Stating Objectives', ar: 'تحديد الأهداف' },
+        { id: 12, en: 'Students\' Involvement', ar: 'مشاركة الطلاب' },
+        { id: 13, en: 'Students\' Use of English', ar: 'استخدام الطلاب للإنجليزية' },
+        { id: 14, en: 'STT vs TTT', ar: 'وقت تحدث الطلاب مقابل المعلم' },
+        { id: 15, en: 'Teacher Temper & Encouragement', ar: 'طبع المعلم وتشجيعه' },
+      ];
+
+      const translations = {
+        en: {
+          title: 'AI Teacher Evaluation Report',
+          subtitle: 'Professional evaluation summary',
+          teacher: 'Teacher',
+          date: 'Date',
+          courses: 'Current Courses',
+          history: 'Course History',
+          overall: 'Overall Score',
+          total: 'Total',
+          level: 'Performance Level',
+          section: 'Detailed Criterion Feedback',
+          footer1: 'Prepared by AI Teacher Evaluation Studio',
+          footer2: 'The First British Center',
+          signature1: 'Sultan Alhammmadi',
+          signature2: 'T. Majed Alsharabi',
+          role1: 'Administrator',
+          role2: 'Supervisor',
+          pending: 'Pending',
+          weak: 'Weak',
+          developing: 'Developing',
+          strong: 'Strong',
+          summaryText: 'This report is generated locally for review, coaching, and planning. It can be printed or exported as HTML for easy sharing.'
+        },
+        ar: {
+          title: 'تقرير تقييم المعلم بالذكاء الاصطناعي',
+          subtitle: 'ملخص تقييم احترافي',
+          teacher: 'المعلم',
+          date: 'التاريخ',
+          courses: 'الدورات الحالية',
+          history: 'سجل الدورات',
+          overall: 'الدرجة الكلية',
+          total: 'الإجمالي',
+          level: 'مستوى الأداء',
+          section: 'ملاحظات تفصيلية حسب المعيار',
+          footer1: 'تمت الإعداد بواسطة نظام تقييم المعلمين بالذكاء الاصطناعي',
+          footer2: 'المركز البريطاني الأول',
+          signature1: 'سلطان الحمادي',
+          signature2: 'ت. ماجد الشرعبي',
+          role1: 'المدير',
+          role2: 'المشرف',
+          pending: 'قيد الانتظار',
+          weak: 'ضعيف',
+          developing: 'متطور',
+          strong: 'قوي',
+          summaryText: 'يتم إنشاء هذا التقرير محليًا للمراجعة والتدريب والتخطيط. يمكن طباعته أو تصديره بصيغة HTML للمشاركة بسهولة.'
+        }
+      };
+
+      const state = {
+        lang: 'en',
+        reportType: 'mixed',
+        scores: Object.fromEntries(criteria.map(c => [c.id, 3]))
+      };
+
+      function renderCriteria() {
+        const container = document.getElementById('criterionList');
+        container.innerHTML = criteria.map(c => `
+          <div class="criterion-item">
+            <div class="criterion-top">
+              <span>${state.lang === 'ar' ? c.ar : c.en}</span>
+              <span>${c.id}</span>
+            </div>
+            <div class="score-row">
+              <input type="range" min="1" max="5" step="1" value="${state.scores[c.id]}" oninput="updateScore(${c.id}, this.value)">
+              <span class="score-pill">${state.scores[c.id]}/5</span>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      function updateScore(id, value) {
+        state.scores[id] = Number(value);
+        renderCriteria();
+        generateReport();
+      }
+
+      function setLanguage(lang) {
+        state.lang = lang;
+        document.querySelectorAll('[data-lang]').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-lang') === lang));
+        document.documentElement.lang = lang;
+        document.dir = lang === 'ar' ? 'rtl' : 'ltr';
+        renderCriteria();
+        generateReport();
+      }
+
+      function setReportType(type) {
+        state.reportType = type;
+        document.querySelectorAll('[data-report]').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-report') === type));
+        generateReport();
+      }
+
+      function getLevel(percent) {
+        if (percent >= 80) return translations[state.lang].strong;
+        if (percent >= 55) return translations[state.lang].developing;
+        return translations[state.lang].weak;
+      }
+
+      function getLevelClass(percent) {
+        if (percent >= 80) return 'badge-strong';
+        if (percent >= 55) return 'badge-dev';
+        return 'badge-weak';
+      }
+
+      function generateReport() {
+        const teacher = document.getElementById('teacherName').value.trim() || (state.lang === 'ar' ? 'معلم غير مسمى' : 'Unnamed Teacher');
+        const date = document.getElementById('evalDate').value || new Date().toISOString().slice(0, 10);
+        const courses = document.getElementById('courses').value.trim() || (state.lang === 'ar' ? 'غير محدد' : 'Not specified');
+        const history = document.getElementById('history').value.trim() || (state.lang === 'ar' ? 'غير محدد' : 'Not specified');
+
+        const total = Object.values(state.scores).reduce((sum, v) => sum + Number(v), 0);
+        const max = criteria.length * 5;
+        const percent = Math.round((total / max) * 100);
+        const level = getLevel(percent);
+        const levelClass = getLevelClass(percent);
+
+        document.getElementById('summaryScore').textContent = `${total} / ${max}`;
+        document.getElementById('summaryPercent').textContent = `${percent}%`;
+        document.getElementById('summaryLevel').textContent = level;
+        document.getElementById('summaryLevel').className = `badge ${levelClass}`;
+
+        const t = translations[state.lang];
+        const bodyTitle = state.reportType === 'mixed' ? (state.lang === 'ar' ? 'تقرير تقييم المعلم' : 'Teacher Evaluation Report') : t.title;
+        const bodyIntro = state.reportType === 'mixed'
+          ? (state.lang === 'ar' ? 'تم إعداد هذا التقرير لتقديم ملاحظات واضحة وفعالة لدعم التطوير المهني.' : 'This report was prepared to provide clear and practical feedback for professional development.')
+          : t.summaryText;
+
+        const feedbackBlocks = criteria.map(c => {
+          const score = state.scores[c.id];
+          const ratio = Math.round((score / 5) * 100);
+          let note = state.lang === 'ar'
+            ? 'التحسين ممكن مع مزيد من التركيز على هذا المعيار.'
+            : 'There is room for growth with more focus on this area.';
+          if (score >= 4) note = state.lang === 'ar' ? 'هذا المعيار قوي ومبشر.' : 'This area is strong and promising.';
+          if (score <= 2) note = state.lang === 'ar' ? 'هذا المعيار يحتاج إلى دعم وتدريب إضافي.' : 'This area needs additional support and coaching.';
+          return `
+            <div style="margin-bottom:12px;padding:12px 14px;border-left:4px solid ${score >= 4 ? 'var(--gold)' : score >= 3 ? 'var(--blue)' : '#ef4444'};background:#faf8f3;border-radius:10px;">
+              <strong>${state.lang === 'ar' ? c.ar : c.en}</strong> · ${score}/5 · ${ratio}%<br>
+              <span style="color:var(--muted);font-size:0.92rem;">${note}</span>
+            </div>`;
+        }).join('');
+
+        const previewHtml = `
+          <div style="font-family:'Segoe UI',sans-serif;color:#14213d;">
+            <div class="report-head">
+              <div style="font-size:0.9rem;color:var(--muted);">${state.reportType === 'mixed' ? 'The First British Center' : 'The First British Center'}</div>
+              <div class="report-title">${state.reportType === 'mixed' ? (state.lang === 'ar' ? 'تقرير تقييم المعلم' : 'Teacher Evaluation Report') : t.title}</div>
+            </div>
+            <p><strong>${t.teacher}:</strong> ${teacher}</p>
+            <p><strong>${t.date}:</strong> ${date}</p>
+            <p><strong>${t.courses}:</strong> ${courses}</p>
+            <p><strong>${t.history}:</strong> ${history}</p>
+            <p><strong>${t.overall}:</strong> ${total}/${max} (${percent}%) <span class="badge ${levelClass}">${level}</span></p>
+            <p style="color:var(--muted);">${bodyIntro}</p>
+            <h4 style="margin:16px 0 10px;color:var(--navy);">${t.section}</h4>
+            ${feedbackBlocks}
+            <div class="footer-line">
+              <div>${state.reportType === 'mixed' ? (state.lang === 'ar' ? 'تمت الإعداد بواسطة نظام تقييم المعلمين بالذكاء الاصطناعي' : 'Prepared by AI Teacher Evaluation Studio') : t.footer1}</div>
+              <div>${state.reportType === 'mixed' ? 'The First British Center' : t.footer2}</div>
+            </div>
+            <div class="footer-line" style="border-top:0;padding-top:0;margin-top:10px;">
+              <div><strong>${state.reportType === 'mixed' ? 'Sultan Alhammmadi' : t.signature1}</strong><br>${state.reportType === 'mixed' ? 'Administrator' : t.role1}</div>
+              <div><strong>${state.reportType === 'mixed' ? 'T. Majed Alsharabi' : t.signature2}</strong><br>${state.reportType === 'mixed' ? 'Supervisor' : t.role2}</div>
+            </div>
+          </div>`;
+
+        document.getElementById('previewBox').innerHTML = previewHtml;
+      }
+
+      function printReport() {
+        const printWindow = window.open('', '_blank', 'width=1000,height=900');
+        if (!printWindow) return;
+        printWindow.document.write(`<html><head><title>AI Teacher Evaluation Report</title><style>body{font-family:Segoe UI,sans-serif;padding:24px;color:#14213d;} .badge{display:inline-block;padding:6px 10px;border-radius:999px;font-size:0.8rem;font-weight:700;} .badge-weak{background:#fde8e8;color:#b91c1c;} .badge-dev{background:#fef3c7;color:#92400e;} .badge-strong{background:#dcfce7;color:#166534;} @media print{body{padding:12px;}}</style></head><body>${document.getElementById('previewBox').innerHTML}</body></html>`);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => printWindow.print(), 300);
+      }
+
+      function downloadHtml() {
+        const html = `<!DOCTYPE html><html lang="${state.lang}"><head><meta charset="UTF-8"><title>AI Teacher Evaluation Report</title><style>body{font-family:Segoe UI,sans-serif;padding:24px;color:#14213d;} .badge{display:inline-block;padding:6px 10px;border-radius:999px;font-size:0.8rem;font-weight:700;} .badge-weak{background:#fde8e8;color:#b91c1c;} .badge-dev{background:#fef3c7;color:#92400e;} .badge-strong{background:#dcfce7;color:#166534;}</style></head><body>${document.getElementById('previewBox').innerHTML}</body></html>`;
+        const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'ai-teacher-eval-report.html';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('evalDate').value = new Date().toISOString().slice(0, 10);
+        renderCriteria();
+        generateReport();
+      });
+    </script>
+  </body>
+</html>

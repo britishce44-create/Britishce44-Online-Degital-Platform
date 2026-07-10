@@ -188,7 +188,7 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
 
       const signalingUrl = (import.meta.env.VITE_SIGNALING_URL as string) || window.location.origin;
       const socket = io(signalingUrl, {
-        path: "/api/socket.io",
+        path: "/signaling",
         transports: ["websocket", "polling"],
         timeout: 15000,
       });
