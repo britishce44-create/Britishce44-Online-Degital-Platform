@@ -20,14 +20,20 @@ self.addEventListener('activate', (event) => {
 
 /* Network-first for API; cache-fallback for static */
 self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') {
+    return
+  }
+
   const url = new URL(event.request.url)
 
   if (url.pathname.startsWith(API_CACHE)) {
     event.respondWith(
       fetch(event.request)
         .then((res) => {
-          const clone = res.clone()
-          caches.open(CACHE_NAME).then((c) => c.put(event.request, clone))
+          if (res.ok) {
+            const clone = res.clone()
+            caches.open(CACHE_NAME).then((c) => c.put(event.request, clone))
+          }
           return res
         })
         .catch(() => caches.match(event.request))
