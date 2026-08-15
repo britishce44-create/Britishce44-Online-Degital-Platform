@@ -1,3 +1,4 @@
+import { ClassroomScrollWrapper } from "./ClassroomScrollWrapper";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useWebRTC } from '../webrtc/webrtc-provider'
@@ -173,7 +174,8 @@ export function ClassroomInterior({ roomId, onClose, dir = 'ltr' }: ClassroomInt
   const effectiveStripH = stripCollapsed ? 36 : stripHeight
 
   return (
-    <div dir={dir} className="flex flex-col h-full overflow-hidden rounded-2xl shadow-2xl"
+    <ClassroomScrollWrapper>
+      <div dir={dir} className="flex flex-col h-full overflow-hidden rounded-2xl shadow-2xl"
       style={{ background: '#1d1668', border: '1px solid rgba(63, 186, 235,0.15)' }}>
 
       {/* ── Header ── */}
@@ -460,5 +462,6 @@ export function ClassroomInterior({ roomId, onClose, dir = 'ltr' }: ClassroomInt
         localName={userName}
       />
     </div>
+    </ClassroomScrollWrapper>
   )
 }
