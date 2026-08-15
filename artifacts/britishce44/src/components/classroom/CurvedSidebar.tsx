@@ -1,154 +1,87 @@
-import { useState } from 'react'
-
-type NavItem = 'Board' | 'Grid' | 'Resources' | 'Chat' | 'Participants' | 'Polls' | 'Breakout' | 'Settings'
+import React from 'react';
+import { 
+  FolderKanban, 
+  MessageSquare, 
+  Users, 
+  BarChart3, 
+  GitFork, 
+  Settings, 
+  LayoutGrid
+} from 'lucide-react';
 
 interface CurvedSidebarProps {
-  activeItem: NavItem
-  onNavigate: (item: NavItem) => void
-  dir?: 'ltr' | 'rtl'
+  activeTab: string;
+  onSelectTab: (tabId: string) => void;
+  onContinue?: () => void;
 }
 
-const NAV_ITEMS: NavItem[] = ['Board', 'Grid', 'Resources', 'Chat', 'Participants', 'Polls', 'Breakout', 'Settings']
-
-const NAV_ICONS: Record<NavItem, string> = {
-  Board: 'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z',
-  Grid: 'M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4z',
-  Resources: 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z',
-  Chat: 'M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z',
-  Participants: 'M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z',
-  Polls: 'M19 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-7 14H6v-2h6v2zm4-4H6v-2h10v2zm0-4H6V7h10v2z',
-  Breakout: 'M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM9 11H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z',
-  Settings: 'M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.07.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z',
-}
-
-export function CurvedSidebar({ activeItem, onNavigate, dir = 'ltr' }: CurvedSidebarProps) {
-  const [hoveredItem, setHoveredItem] = useState<NavItem | null>(null)
+export const CurvedSidebar: React.FC<CurvedSidebarProps> = ({
+  activeTab,
+  onSelectTab,
+  onContinue,
+}) => {
+  const navItems = [
+    { id: 'board', label: 'Board', icon: LayoutGrid },
+    { id: 'grid', label: 'Grid', icon: FolderKanban },
+    { id: 'resources', label: 'Resources', icon: FolderKanban },
+    { id: 'chat', label: 'Chat', icon: MessageSquare },
+    { id: 'participants', label: 'Participants', icon: Users },
+    { id: 'polls', label: 'Polls', icon: BarChart3 },
+    { id: 'breakout', label: 'Breakout', icon: GitFork },
+    { id: 'settings', label: 'Settings', icon: Settings },
+  ];
 
   return (
-    <div
-      dir={dir}
-      className="relative flex flex-col justify-between"
-      style={{
-        width: '220px',
-        minWidth: 180,
-        height: 'calc(100vh - 12px)',
-        margin: '6px',
-        background: 'linear-gradient(180deg, #022080 0%, #082d96 45%, #031861 100%)',
-        borderRadius: '28px 45px 28px 28px',
-        position: 'relative',
-        overflow: 'hidden',
-        boxShadow: '0 12px 36px rgba(2, 32, 128, 0.35)',
-        flexShrink: 0,
-        zIndex: 20,
-      }}
-    >
-      {/* S-Curved Wave Outer Border with Gold Accent */}
-      <svg
-        className="absolute right-0 top-0 h-full"
-        width="36"
-        height="100%"
-        viewBox="0 0 36 800"
-        preserveAspectRatio="none"
-        style={{ pointerEvents: 'none' }}
-      >
-        <defs>
-          <linearGradient id="goldGradient" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#f3e092" />
-            <stop offset="50%" stopColor="#d4af37" />
-            <stop offset="100%" stopColor="#8a6713" />
-          </linearGradient>
-        </defs>
-        <path
-          d="M36 0 C -10 160, 45 320, 5 480 C -20 620, 36 720, 36 800 L 36 0 Z"
-          fill="url(#goldGradient)"
-          opacity="0.85"
-        />
-        <path
-          d="M32 0 C -12 160, 41 320, 1 480 C -24 620, 32 720, 32 800 L 36 0 Z"
-          fill="#022080"
-        />
-      </svg>
-
-      {/* Floating Gold Ring Icon Header */}
-      <div className="relative flex flex-col items-center pt-6 pb-2 z-10">
-        <div
-          className="relative flex items-center justify-center transition-transform hover:scale-105"
-          style={{
-            width: 68,
-            height: 68,
-            borderRadius: '50%',
-            background: 'linear-gradient(145deg, #0933a8, #021a69)',
-            border: '2.5px solid #d4af37',
-            boxShadow: '0 8px 20px rgba(0,0,0,0.35), inset 0 2px 4px rgba(255,255,255,0.25)',
-          }}
-        >
-          <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="7" height="7" rx="2" />
-            <rect x="14" y="3" width="7" height="7" rx="2" />
-            <rect x="3" y="14" width="7" height="7" rx="2" />
-            <rect x="14" y="14" width="7" height="7" rx="2" />
-          </svg>
+    <aside className="relative w-64 h-full flex flex-col justify-between overflow-hidden select-none bg-gradient-to-b from-[#001f6d] via-[#002f9c] to-[#001242] text-white shrink-0 z-20">
+      <div 
+        className="absolute inset-y-0 right-0 w-4 bg-gradient-to-b from-[#fcd34d] via-[#f59e0b] to-[#b45309] pointer-events-none z-20"
+        style={{
+          clipPath: 'polygon(100% 0, 100% 100%, 0% 100%, 70% 75%, 15% 45%, 85% 20%, 0% 0%)',
+        }}
+      />
+      <div 
+        className="absolute inset-0 bg-gradient-to-b from-[#001c63] via-[#0033a8] to-[#00113b] z-10"
+        style={{
+          clipPath: 'polygon(0 0, 97% 0, 77% 20%, 12% 45%, 62% 75%, 97% 100%, 0 100%)',
+        }}
+      />
+      <div className="relative z-30 pt-5 px-5 flex flex-col items-start">
+        <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-tr from-[#fcd34d] via-[#fbbf24] to-[#b45309] shadow-lg flex items-center justify-center">
+          <div className="w-full h-full rounded-full bg-[#001854] flex flex-col items-center justify-center border border-[#fef3c7]">
+            <span className="text-[10px] font-bold text-amber-200 tracking-wider">
+              B C
+            </span>
+          </div>
         </div>
       </div>
-
-      {/* Navigation Links */}
-      <nav className="relative flex-1 flex flex-col items-center gap-1.5 px-3 py-4 z-10 overflow-y-auto custom-scroll">
-        {NAV_ITEMS.map((item) => {
-          const isActive = activeItem === item
-          const isHovered = hoveredItem === item
-
+      <nav className="relative z-30 flex-1 my-4 px-3 space-y-1 overflow-y-auto">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
           return (
             <button
-              key={item}
-              onClick={() => onNavigate(item)}
-              onMouseEnter={() => setHoveredItem(item)}
-              onMouseLeave={() => setHoveredItem(null)}
-              className="relative w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200"
-              style={{
-                background: isActive
-                  ? '#FFFDF7'
-                  : isHovered
-                  ? 'rgba(255, 255, 255, 0.12)'
-                  : 'transparent',
-                color: isActive ? '#022080' : '#FFFFFF',
-                boxShadow: isActive ? '0 4px 14px rgba(0,0,0,0.2)' : 'none',
-                border: isActive ? '1px solid #d4af37' : '1px solid transparent',
-              }}
-              title={item}
+              key={item.id}
+              onClick={() => onSelectTab(item.id)}
+              className={`w-[85%] flex items-center gap-3 px-3.5 py-2 rounded-full text-xs font-semibold transition-all duration-150 ${
+                isActive
+                  ? 'bg-white text-[#001f6d] shadow-md transform translate-x-1'
+                  : 'text-blue-100 hover:bg-white/10 hover:text-white'
+              }`}
             >
-              <svg
-                className="flex-shrink-0"
-                style={{ width: 20, height: 20 }}
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d={NAV_ICONS[item]} />
-              </svg>
-              <span className={`text-[14px] font-semibold truncate ${isActive ? 'text-[#022080]' : 'text-white'}`}>
-                {item}
-              </span>
+              <Icon className={`w-4 h-4 ${isActive ? 'text-[#001f6d]' : 'text-blue-200'}`} />
+              <span>{item.label}</span>
             </button>
-          )
+          );
         })}
       </nav>
-
-      {/* Bottom Styled Button (Matches 'Continue' button from reference) */}
-      <div className="relative px-3 pb-5 pt-2 z-10 flex justify-center">
-        <button
-          className="w-full py-2.5 rounded-2xl font-bold text-white text-sm transition-all duration-200 hover:brightness-110 active:scale-95"
-          style={{
-            background: 'linear-gradient(180deg, #093abf 0%, #031b70 100%)',
-            border: '2px solid #d4af37',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          }}
+      <div className="relative z-30 pb-6 px-4">
+        <button 
+          onClick={onContinue}
+          className="w-[82%] py-2.5 px-4 rounded-full bg-gradient-to-r from-[#001242] to-[#002f9c] border-2 border-[#f59e0b] text-white font-bold text-xs shadow-lg hover:brightness-110 transition-all text-center"
         >
           Continue
         </button>
       </div>
-    </div>
-  )
-}
+    </aside>
+  );
+};
