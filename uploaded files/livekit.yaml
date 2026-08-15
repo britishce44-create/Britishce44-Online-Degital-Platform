@@ -1,0 +1,22 @@
+port: 7880
+bind_addresses:
+  - "0.0.0.0"
+logging:
+  json: true
+  level: info
+rtc:
+  udp_port: 50000
+  port_range_end: 52000
+  tcp_port: 7881
+  use_external_ip: true
+  enable_loopback_candidate: false
+room:
+  auto_create: true
+  departure_timeout: 20
+  empty_timeout: 300
+  enabled_codecs:
+    - mime: audio/opus
+    - mime: video/vp8
+    - mime: video/h264
+keys:
+  0367c0753663d174ae13ac58c8c2f2af: UMygi8XvzdtxqHCdDDmij3jPUCEWR94M
