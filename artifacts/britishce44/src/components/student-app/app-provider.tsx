@@ -16,6 +16,43 @@ export interface AppClassEvent {
   startTime: string; endTime: string; date: string; weekday?: number; level?: string | null; courseId?: number
 }
 
+export interface AppAssignment {
+  id: number
+  classroomId: number
+  classroomLabel: string | null
+  roomId: number | null
+  classroomStatus: string | null
+  userRole: 'student' | 'teacher'
+  assignmentType: string
+  status: string
+  startDate: string
+  endDate: string | null
+  loginTime: string
+  leaveTime: string
+  earlyLoginAllowance: number
+  timezone: string
+  scheduleFrequency: string
+  scheduleDays: number[] | null
+  scheduleConfig: any
+  schedule: {
+    startTime: string
+    endTime: string
+    days: number[] | null
+    frequency: string
+    timezone: string | null
+  } | null
+  accessPolicy: {
+    allowRoom1Access: boolean
+    room1Policy: string
+    allowedClassroomIds: number[] | null
+    requireTeacherApproval: boolean
+    capacity: number | null
+    allowOverride: boolean
+    isLocked: boolean
+    lockReason: string | null
+  } | null
+}
+
 interface AppNotification {
   id: string; title: string; body: string; time: string; read: boolean; type: 'class' | 'message' | 'announcement' | 'alert'
 }
@@ -23,6 +60,7 @@ interface AppNotification {
 interface AppState {
   student: AppStudentData | null
   classes: AppClassEvent[]
+  assignments: AppAssignment[]
   notifications: AppNotification[]
   unreadCount: number
   online: boolean
@@ -35,6 +73,7 @@ interface AppContextType extends AppState {
   markRead: (id: string) => void
   setOnline: (v: boolean) => void
   syncSchedule: () => Promise<void>
+  syncAssignments: () => Promise<void>
   refreshConfig: () => Promise<void>
 }
 
@@ -48,6 +87,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [classes, setClasses] = useState<AppClassEvent[]>(() => {
     const c = localStorage.getItem('b44_app_classes')
     return c ? JSON.parse(c) : []
+  })
+  const [assignments, setAssignments] = useState<AppAssignment[]>(() => {
+    const a = localStorage.getItem('b44_app_assignments')
+    return a ? JSON.parse(a) : []
   })
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
     const n = localStorage.getItem('b44_app_notifications')
@@ -110,6 +153,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, [])
 
+  const syncAssignments = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('b44_app_token')
+      if (!token) return
+      const res = await fetch('/api/v1/classroom-assignments/mine', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      const fetched: AppAssignment[] = data.assignments || []
+      setAssignments(fetched)
+      localStorage.setItem('b44_app_assignments', JSON.stringify(fetched))
+    } catch {}
+  }, [])
+
   const refreshConfig = useCallback(async () => {
     try {
       const token = localStorage.getItem('b44_app_token')
@@ -130,8 +188,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      student, classes, notifications, unreadCount, online,
-      setStudent, logout, addNotification, markRead, setOnline, syncSchedule, refreshConfig,
+      student, classes, assignments, notifications, unreadCount, online,
+      setStudent, logout, addNotification, markRead, setOnline, syncSchedule, syncAssignments, refreshConfig,
     }}>
       {children}
     </AppContext.Provider>

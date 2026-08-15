@@ -86,7 +86,7 @@ apt install -y nginx
 cat > /etc/nginx/sites-available/britishce44 << 'NGINX'
 server {
     listen 80;
-    server_name platform.britishce44.com;
+    server_name platform.britishce4.com;
 
     # Redirect to HTTPS (after cert)
     return 301 https://$host$request_uri;
@@ -94,11 +94,11 @@ server {
 
 server {
     listen 443 ssl http2;
-    server_name platform.britishce44.com;
+    server_name platform.britishce4.com;
 
     # SSL (get with certbot after domain pointed)
-    ssl_certificate /etc/letsencrypt/live/platform.britishce44.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/platform.britishce44.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/platform.britishce4.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/platform.britishce4.com/privkey.pem;
 
     # Frontend
     root /opt/britishce44/artifacts/britishce44/dist/public;
@@ -130,7 +130,7 @@ ln -s /etc/nginx/sites-available/britishce44 /etc/nginx/sites-enabled/
 nginx -t && systemctl reload nginx
 
 # Get SSL certificate (after pointing domain)
-certbot --nginx -d platform.britishce44.com
+certbot --nginx -d platform.britishce4.com
 ```
 
 ### Step 6 — Build & Deploy Frontend
@@ -203,7 +203,7 @@ function HomePage() {
 Add this ONE line to your site's `<head>` or footer:
 
 ```html
-<script src="https://violet-finch-872010.hostingersite.com/embed.js" data-mode="redirect"></script>
+<script src="https://platform.britishce4.com/embed.js" data-mode="redirect"></script>
 ```
 
 Options:

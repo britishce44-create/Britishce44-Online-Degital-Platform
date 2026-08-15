@@ -14,6 +14,7 @@ import classroomAssessmentRouter from "./classroom-assessment";
 import quizzesRouter from "./quizzes";
 import libraryRouter from "./library";
 import classroomSessionsRouter from "./classroom-sessions";
+import classroomAssignmentsRouter from "./classroom-assignments";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(classroomAssessmentRouter);
 router.use(quizzesRouter);
 router.use(libraryRouter);
 router.use(classroomSessionsRouter);
+router.use(classroomAssignmentsRouter);
 
 export default router;

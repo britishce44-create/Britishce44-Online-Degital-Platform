@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../components/providers/auth-provider'
 import { apiGet, type GoogleStatus } from '@/lib/api'
+import { ClassroomAssignmentManager } from '@/components/classroom/ClassroomAssignmentManager'
 
 const BLUE = '#2563eb'
 const GOLD = '#00ae74'
@@ -322,6 +323,13 @@ export function SettingsPage() {
             ))}
           </div>
         </SectionCard>
+
+        {/* Classroom Assignment & Management */}
+        {isAdmin && (
+          <SectionCard icon="🎓" title="Classroom Assignment & Management" titleAr="إدارة تعيين الفصول" span>
+            <ClassroomAssignmentManager />
+          </SectionCard>
+        )}
 
         {/* Roles & Permissions */}
         <SectionCard icon="🛡️" title="Roles & Permissions" titleAr="الأدوار والصلاحيات" span>

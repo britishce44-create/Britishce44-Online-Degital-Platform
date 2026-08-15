@@ -11,3 +11,4 @@ export * from "./quizzes";
 export * from "./enrollments";
 export * from "./library";
 export * from "./classroom-sessions";
+export * from "./classroom-assignments";

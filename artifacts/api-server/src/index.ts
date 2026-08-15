@@ -6,6 +6,8 @@ import { seedIfEmpty, seedEval, seedClassrooms } from "./lib/seed";
 import { tick, startScheduler } from "./lib/scheduler";
 import { mediaSoupManager } from "./mediasoup/MediaSoupManager";
 import { attachSignalingNamespace } from "./mediasoup/SignalingNamespace";
+import { db, classroomParticipants, classroomAssignments, appUsers } from "@workspace/db";
+import { eq, and } from "drizzle-orm";
 
 const rawPort = process.env["PORT"];
 
@@ -42,6 +44,15 @@ const io = new SocketIOServer(httpServer, {
 
 attachSignalingNamespace(io);
 
+/* ── Classroom Assignment Real-time Events ── */
+
+// Track participant connections per classroom
+const participantRooms = new Map<string, Map<string, { socketId: string; userId: string; name: string; role: string }>>();
+
+function broadcastToClassroom(classroomId: number, event: string, data: any) {
+  io.to(`classroom-${classroomId}`).emit(event, data);
+}
+
 io.on("connection", (socket) => {
   let currentRoom: string | null = null;
 
@@ -77,7 +88,21 @@ io.on("connection", (socket) => {
 
       room.set(socket.id, myInfo);
       socket.join(currentRoom);
+      socket.join(`classroom-${currentRoom}`);
       socket.to(currentRoom).emit("peer-joined", myInfo);
+
+      // Track participant in assignment system
+      if (!participantRooms.has(currentRoom)) participantRooms.set(currentRoom, new Map());
+      participantRooms.get(currentRoom)!.set(socket.id, { socketId: socket.id, userId, name, role });
+
+      // Emit participant joined for assignment system
+      broadcastToClassroom(Number(currentRoom), "participant-joined", {
+        socketId: socket.id,
+        userId,
+        name,
+        role,
+        status: "active",
+      });
     },
   );
 
@@ -123,11 +148,11 @@ io.on("connection", (socket) => {
 
   socket.on(
     "media-state",
-    ({ muted, cameraOn }: { muted: boolean; cameraOn: boolean }) => {
+    ({ muted, cameraOn, screenShare }: { muted: boolean; cameraOn: boolean; screenShare?: boolean }) => {
       if (currentRoom)
         socket
           .to(currentRoom)
-          .emit("media-state", { socketId: socket.id, muted, cameraOn });
+          .emit("media-state", { socketId: socket.id, muted, cameraOn, screenShare });
     },
   );
 
@@ -171,6 +196,76 @@ io.on("connection", (socket) => {
     io.to(socketId).emit("anti-cheat-warning", { warningCount, message });
   });
 
+  /* ── Classroom Assignment Events ── */
+
+  // Participant status change (teacher/admin only)
+  socket.on("participant-status", ({ classroomId, participantId, status }: { classroomId: number; participantId: string; status: string }) => {
+    const peer = currentRoom ? rooms.get(currentRoom)?.get(socket.id) : null;
+    if (!peer || (peer.role !== "teacher" && peer.role !== "admin")) return;
+    
+    broadcastToClassroom(classroomId, "participant-status-changed", { participantId, status });
+    
+    // Update database
+    db.update(classroomParticipants)
+      .set({ status: status as any, updatedAt: new Date() })
+      .where(eq(classroomParticipants.id, Number(participantId)))
+      .catch(() => {});
+  });
+
+  // Force permission change (teacher/admin only)
+  socket.on("force-permission", ({ classroomId, participantId, feature, action }: { classroomId: number; participantId: string; feature: string; action: string }) => {
+    const peer = currentRoom ? rooms.get(currentRoom)?.get(socket.id) : null;
+    if (!peer || (peer.role !== "teacher" && peer.role !== "admin")) return;
+    
+    broadcastToClassroom(classroomId, "permission-changed", { participantId, feature, action });
+    
+    // Update database
+    const participant = db.select().from(classroomParticipants).where(eq(classroomParticipants.id, Number(participantId))).limit(1);
+    // Note: In production, this would be a proper async call
+  });
+
+  // Assign presenter
+  socket.on("assign-presenter", ({ classroomId, participantId }: { classroomId: number; participantId: string }) => {
+    const peer = currentRoom ? rooms.get(currentRoom)?.get(socket.id) : null;
+    if (!peer || (peer.role !== "teacher" && peer.role !== "admin")) return;
+    
+    broadcastToClassroom(classroomId, "presenter-assigned", { participantId });
+  });
+
+  // Remove presenter
+  socket.on("remove-presenter", ({ classroomId, participantId }: { classroomId: number; participantId: string }) => {
+    const peer = currentRoom ? rooms.get(currentRoom)?.get(socket.id) : null;
+    if (!peer || (peer.role !== "teacher" && peer.role !== "admin")) return;
+    
+    broadcastToClassroom(classroomId, "presenter-removed", { participantId });
+  });
+
+  // Move participant to another classroom
+  socket.on("move-participant", ({ classroomId, participantId, toClassroomId, isTemporary, reason }: { classroomId: number; participantId: string; toClassroomId: number; isTemporary?: boolean; reason?: string }) => {
+    const peer = currentRoom ? rooms.get(currentRoom)?.get(socket.id) : null;
+    if (!peer || (peer.role !== "teacher" && peer.role !== "admin")) return;
+    
+    broadcastToClassroom(classroomId, "participant-moved", { participantId, toClassroomId, isTemporary, reason });
+    broadcastToClassroom(toClassroomId, "participant-moved", { participantId, fromClassroomId: classroomId, isTemporary, reason });
+  });
+
+  // Transfer student to Room 1 (emergency)
+  socket.on("transfer-to-room1", ({ classroomId, participantId, reason }: { classroomId: number; participantId: string; reason?: string }) => {
+    const peer = currentRoom ? rooms.get(currentRoom)?.get(socket.id) : null;
+    if (!peer || (peer.role !== "teacher" && peer.role !== "admin")) return;
+    
+    broadcastToClassroom(classroomId, "participant-moved", { participantId, toClassroomId: 1, isTemporary: true, reason });
+    broadcastToClassroom(1, "participant-moved", { participantId, fromClassroomId: classroomId, isTemporary: true, reason });
+  });
+
+  // Lock/unlock classroom
+  socket.on("classroom-lock", ({ classroomId, locked, reason }: { classroomId: number; locked: boolean; reason?: string }) => {
+    const peer = currentRoom ? rooms.get(currentRoom)?.get(socket.id) : null;
+    if (!peer || (peer.role !== "teacher" && peer.role !== "admin")) return;
+    
+    broadcastToClassroom(classroomId, "classroom-locked", { locked, reason });
+  });
+
   socket.on("disconnect", () => {
     if (!currentRoom) return;
     const room = rooms.get(currentRoom);
@@ -178,6 +273,15 @@ io.on("connection", (socket) => {
     room.delete(socket.id);
     if (room.size === 0) rooms.delete(currentRoom);
     else socket.to(currentRoom).emit("peer-left", { socketId: socket.id });
+
+    // Clean up participant tracking
+    participantRooms.get(currentRoom)?.delete(socket.id);
+    if (participantRooms.get(currentRoom)?.size === 0) {
+      participantRooms.delete(currentRoom);
+    }
+
+    // Emit participant left for assignment system
+    broadcastToClassroom(Number(currentRoom), "participant-left", { socketId: socket.id });
   });
 });
 

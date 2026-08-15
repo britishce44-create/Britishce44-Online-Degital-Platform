@@ -1,7 +1,9 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
+import { Search, RefreshCw, Settings, Pencil, Check } from 'lucide-react'
 import { apiGet, ApiError, type ClassroomRoom } from '@/lib/api'
+import { SettingsSidebar } from '@/components/settings/settings-sidebar'
 
 type RoomStatus = 'live' | 'scheduled' | 'empty' | 'locked'
 
@@ -11,13 +13,7 @@ interface RoomCard extends ClassroomRoom {
   teacherDisplay: string
   studentDisplay: number
   joinCode: number
-}
-
-const STATUS_CONFIG: Record<RoomStatus, { label: string; color: string; glow: string; bg: string; dot: string }> = {
-  live:      { label: 'LIVE',      color: '#34d399', glow: '0 0 14px rgba(52,211,153,0.55)', bg: 'rgba(16,185,129,0.09)', dot: 'bg-emerald-400 animate-pulse' },
-  scheduled: { label: 'Scheduled', color: '#3b82f6', glow: '0 0 10px rgba(59,130,246,0.40)', bg: 'rgba(37,99,235,0.08)',  dot: 'bg-blue-500' },
-  empty:     { label: 'Empty',     color: '#4b5563', glow: 'none',                             bg: 'transparent',           dot: 'bg-gray-600' },
-  locked:    { label: 'Locked',    color: '#f87171', glow: '0 0 8px rgba(248,113,113,0.3)',   bg: 'rgba(239,68,68,0.05)',  dot: 'bg-red-400' },
+  num: number
 }
 
 const STATUS_SEQUENCE: RoomStatus[] = ['live', 'scheduled', 'empty', 'empty', 'locked', 'live', 'scheduled', 'empty']
@@ -45,8 +41,11 @@ const FALLBACK_ROOMS: RoomCard[] = Array.from({ length: 60 }, (_, i) => {
     teacherDisplay: 'Teacher',
     studentDisplay: status === 'live' ? 10 + (id % 10) : 0,
     joinCode: 100 + id,
+    num: i + 1,
   }
 })
+
+const TEACHER_STORAGE_KEY = 'b44_classroom_teachers'
 
 function getJoinLink(roomId: number): string {
   return `${window.location.origin}${window.location.pathname}?room=${roomId}`
@@ -55,128 +54,273 @@ function getJoinLink(roomId: number): string {
 function copyJoinLink(roomId: number) {
   const link = getJoinLink(roomId)
   navigator.clipboard.writeText(link).then(() => {
-    toast.success(`🔗 Room ${roomId} link copied!`, { duration: 2000 })
+    toast.success(`Link for room ${roomId} copied`, { duration: 2000 })
   }).catch(() => {
     toast.error('Could not copy link')
   })
 }
 
-function ClassroomCard({ room, onEnter }: { room: RoomCard; onEnter: (id: number) => void }) {
-  const s = STATUS_CONFIG[room.status]
+/* ── Inline card icons (match the reference design exactly) ── */
+
+function GridIcon() {
+  return (
+    <svg viewBox="0 0 24 24" style={{ width: 35, height: 35, fill: '#ffffff' }}>
+      <path d="M3 3h8v8H3V3m10 0h8v8h-8V3M3 13h8v8H3v-8m10 0h8v8h-8v-8z" />
+    </svg>
+  )
+}
+
+function DeskIllustration() {
+  return (
+    <svg viewBox="0 0 200 160" style={{ width: '100%', maxWidth: 160, height: 'auto' }}>
+      <rect x="20" y="40" width="140" height="90" rx="4" fill="#062263" stroke="#1d4db8" strokeWidth="2" />
+      <rect x="30" y="50" width="120" height="70" fill="#0b328a" />
+      <rect x="10" y="110" width="160" height="8" rx="2" fill="#1442b5" />
+      <rect x="25" y="118" width="8" height="30" fill="#1442b5" />
+      <rect x="145" y="118" width="8" height="30" fill="#1442b5" />
+      <rect x="55" y="100" width="25" height="30" rx="3" fill="#1442b5" />
+      <path d="M50 135 L85 135" stroke="#1442b5" strokeWidth="4" />
+      <path d="M165 118 C165 95 180 95 180 118 Z" fill="#1442b5" />
+      <rect x="160" y="118" width="20" height="20" rx="2" fill="#0e348f" />
+    </svg>
+  )
+}
+
+function TrophyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" style={{ width: 20, height: 20, fill: '#d4af37', flexShrink: 0 }}>
+      <path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94A5.01 5.01 0 0 0 11 15.9V19H7v2h10v-2h-4v-3.1a5.01 5.01 0 0 0 3.61-2.96C19.08 10.63 21 8.55 21 6V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z" />
+    </svg>
+  )
+}
+
+function StarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" style={{ width: 20, height: 20, fill: '#d4af37', background: '#fff', padding: '0 8px', position: 'relative', zIndex: 1 }}>
+      <path d="M12 2l2.4 7.4h7.6l-6 4.6 2.3 7.4-6.3-4.6-6.3 4.6 2.3-7.4-6-4.6h7.6z" />
+    </svg>
+  )
+}
+
+function PersonIcon() {
+  return (
+    <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: '#b58d3d' }}>
+      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+    </svg>
+  )
+}
+
+function UsersIcon() {
+  return (
+    <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: '#1952d4' }}>
+      <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+    </svg>
+  )
+}
+
+function LinkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" style={{ width: 16, height: 16, fill: '#b58d3d' }}>
+      <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z" />
+    </svg>
+  )
+}
+
+function PlayIcon() {
+  return (
+    <svg viewBox="0 0 24 24" style={{ width: 18, height: 18, fill: '#ffffff' }}>
+      <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z" />
+    </svg>
+  )
+}
+
+function ArrowIcon() {
+  return (
+    <svg viewBox="0 0 24 24" style={{ width: 14, height: 14 }}>
+      <path d="M5 13h11.86l-5.6 5.6 1.42 1.42L21.42 12l-7.74-8-1.42 1.42 5.6 5.6H5z" fill="#fff" />
+    </svg>
+  )
+}
+
+/* ── Status badge ── */
+
+const BADGE: Record<RoomStatus, { label: string; color: string; dot: string }> = {
+  live:      { label: 'LIVE',      color: '#1b8a3e', dot: '#2ecc71' },
+  scheduled: { label: 'SCHEDULED', color: '#1d4ed8', dot: '#60a5fa' },
+  empty:     { label: 'AVAILABLE', color: '#6b7280', dot: '#94a3b8' },
+  locked:    { label: 'LOCKED',    color: '#dc2626', dot: '#f87171' },
+}
+
+/* ── Manually-edited teacher name field ── */
+
+function TeacherField({ value, onSave }: { value: string; onSave: (name: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+
+  const commit = () => {
+    const v = draft.trim()
+    onSave(v)
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div onClick={e => e.stopPropagation()} className="flex items-center gap-1.5 flex-1 min-w-0">
+        <input
+          autoFocus
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e => {
+            if (e.key === 'Enter') commit()
+            if (e.key === 'Escape') { setDraft(value); setEditing(false) }
+          }}
+          placeholder="Add teacher name…"
+          style={{ border: '1px solid #d4af37', background: '#fdfaf3', color: '#222', fontWeight: 600, fontSize: 15, padding: '6px 12px', borderRadius: 12, width: '100%', maxWidth: 280, outline: 'none' }}
+        />
+        <button onClick={commit} className="flex items-center justify-center"
+          style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#104fe6 0%,#072d8a 100%)', border: '1px solid #d4af37', cursor: 'pointer' }}>
+          <Check className="w-3.5 h-3.5 text-white" />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); setDraft(value); setEditing(true) }}
+      title="Click to edit teacher name"
+      className="flex items-center gap-2 rounded-lg px-1.5 py-0.5 transition group"
+      style={{ cursor: 'pointer', background: 'transparent' }}
+    >
+      <span style={{ fontSize: 15, fontWeight: 600, color: '#222' }}>{value || '—'}</span>
+      <Pencil className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 transition" style={{ color: '#b58d3d' }} />
+    </button>
+  )
+}
+
+/* ── Classroom card ── */
+
+function ClassroomCard({ room, teacherName, onTeacherChange, onEnter }: {
+  room: RoomCard
+  teacherName: string
+  onTeacherChange: (name: string) => void
+  onEnter: (id: number) => void
+}) {
+  const locked = room.status === 'locked'
+  const badge = BADGE[room.status]
+  const handleEnter = () => !locked && onEnter(room.joinCode)
+
   return (
     <motion.div
-      whileHover={{ scale: 1.025, y: -3 }}
-      whileTap={{ scale: 0.97 }}
-      onClick={() => room.status !== 'locked' && onEnter(room.joinCode)}
-      className="relative rounded-xl overflow-hidden cursor-pointer select-none flex flex-col"
+      whileHover={locked ? undefined : { y: -4 }}
+      whileTap={locked ? undefined : { scale: 0.985 }}
+      onClick={handleEnter}
+      className="relative flex overflow-hidden cursor-pointer select-none"
       style={{
-        minHeight: '172px',
-        background: `linear-gradient(145deg, #2a2196 0%, #122055 100%)`,
-        border: `1px solid ${room.status === 'live' ? 'rgba(52,211,153,0.28)' : room.status === 'locked' ? 'rgba(248,113,113,0.22)' : 'rgba(37,99,235,0.18)'}`,
-        boxShadow: room.status === 'live' ? s.glow : room.status === 'scheduled' ? s.glow : undefined,
+        background: '#ffffff',
+        borderRadius: 30,
+        boxShadow: '0 15px 35px rgba(0,0,0,0.10)',
+        border: '1px solid #f0e6d2',
+        minHeight: 300,
       }}>
 
-      {/* Top accent line */}
-      <div className="absolute top-0 left-0 right-0 h-[2px]"
-        style={{ background: room.status === 'live'
-          ? 'linear-gradient(90deg,transparent,#34d399,transparent)'
-          : room.status === 'locked'
-            ? 'linear-gradient(90deg,transparent,#f87171,transparent)'
-            : room.status === 'scheduled'
-              ? 'linear-gradient(90deg,transparent,#3b82f6,transparent)'
-              : 'linear-gradient(90deg,transparent,rgba(37,99,235,0.25),transparent)' }} />
+      {/* Left banner */}
+      <div className="relative flex flex-col items-center justify-between flex-shrink-0"
+        style={{ width: '35%', background: 'linear-gradient(135deg,#0b3bb1 0%,#041c5c 100%)', padding: '28px 18px', borderTopLeftRadius: 30, borderBottomLeftRadius: 30 }}>
+        {/* Wavy divider curve */}
+        <div style={{ position: 'absolute', top: 0, right: -30, width: 60, height: '100%', background: 'radial-gradient(circle at left, transparent 65%, #0b3bb1 66%)', borderRadius: '50%', zIndex: 2 }} />
+        <div className="flex items-center justify-center"
+          style={{ width: 75, height: 75, background: 'linear-gradient(135deg,#104fe6 0%,#072d8a 100%)', border: '3px solid #d4af37', borderRadius: '50%', boxShadow: '0 6px 15px rgba(0,0,0,0.3)', zIndex: 3 }}>
+          <GridIcon />
+        </div>
+        <div style={{ opacity: 0.85, zIndex: 3, textAlign: 'center' }}>
+          <DeskIllustration />
+        </div>
+        <div />
+      </div>
 
-      <div className="p-4 flex flex-col flex-1">
-        {/* Header: room ID + status */}
-        <div className="flex items-start justify-between mb-3">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xs font-black flex-shrink-0"
-            style={{
-              background: room.status === 'live'
-                ? 'linear-gradient(135deg,#064e3b,#00684a)'
-                : room.status === 'locked'
-                  ? 'linear-gradient(135deg,#450a0a,#7f1d1d)'
-                  : 'linear-gradient(135deg,#241c80,#2620a8)',
-              color: s.color,
-              boxShadow: s.glow !== 'none' ? s.glow : undefined,
-              fontSize: room.status === 'locked' ? '16px' : '11px',
-            }}>
-            {room.status === 'locked' ? '🔒' : room.joinCode}
-          </div>
-          <div className="flex flex-col items-end gap-0.5">
-            <div className="flex items-center gap-1">
-              <div className={`w-2 h-2 rounded-full ${s.dot}`} />
-              <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: s.color }}>
-                {s.label}
-              </span>
-            </div>
-            {room.status === 'live' && (
-              <span className="text-[8px] text-emerald-400/70 flex items-center gap-0.5">
-                👥 {room.studentDisplay}
-              </span>
-            )}
-            {room.status === 'scheduled' && room.startTime && (
-              <span className="text-[8px]" style={{ color: 'rgba(59,130,246,0.7)' }}>⏰ {room.startTime}</span>
-            )}
+      {/* Right content */}
+      <div className="flex flex-col flex-1" style={{ padding: '30px 28px 22px 44px', zIndex: 1, minWidth: 0 }}>
+        <div className="flex items-start justify-between gap-3">
+          <h1 style={{ fontSize: 'clamp(22px, 3.2vw, 32px)', color: '#0b2265', fontWeight: 800, lineHeight: 1.1, whiteSpace: 'nowrap' }}>
+            Room {room.num}
+          </h1>
+          <div className="flex items-center" style={{ background: '#ffffff', border: '1px solid #e0e0e0', padding: '6px 14px', borderRadius: 20, gap: 6, fontWeight: 700, fontSize: 14, color: badge.color, boxShadow: '0 2px 5px rgba(0,0,0,0.05)', flexShrink: 0 }}>
+            <span style={{ width: 8, height: 8, background: badge.dot, borderRadius: '50%', boxShadow: room.status === 'live' ? '0 0 6px #2ecc71' : 'none' }} />
+            {badge.label}
           </div>
         </div>
 
-        {/* Subject + grade */}
-        <p className="text-[11px] font-bold text-white leading-snug">{room.subjectLine}</p>
-        <p className="text-[10px] mt-0.5 font-medium" style={{ color: 'rgba(147,197,253,0.65)' }}>
-          {room.teacherDisplay} · {room.computedGrade}
-        </p>
+        <div className="flex items-center" style={{ background: '#fdfaf3', border: '1px solid #f4e8d0', padding: '10px 18px', borderRadius: 25, gap: 12, marginTop: 14, width: 'fit-content', maxWidth: '100%' }}>
+          <TrophyIcon />
+          <span style={{ color: '#a67c1e', fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap' }}>Together we build your success</span>
+        </div>
 
-        {/* Spacer pushes button to bottom */}
+        <div className="flex items-center justify-center" style={{ margin: '16px 0', position: 'relative' }}>
+          <div style={{ position: 'absolute', width: '100%', height: 1, background: '#eee' }} />
+          <StarIcon />
+        </div>
+
+        <div style={{ fontSize: 18, color: '#0c1838', fontWeight: 700, marginBottom: 18 }}>Britishce44-Online Virtual Room {room.num}</div>
+
+        <div className="flex items-center" style={{ gap: 12, marginBottom: 12 }}>
+          <div className="flex items-center justify-center" style={{ width: 32, height: 32, background: '#f2e9dc', borderRadius: '50%', flexShrink: 0 }}>
+            <PersonIcon />
+          </div>
+          <TeacherField value={teacherName} onSave={onTeacherChange} />
+        </div>
+
+        <div className="flex items-center" style={{ gap: 12 }}>
+          <div className="flex items-center justify-center" style={{ width: 32, height: 32, background: '#e3ecfc', borderRadius: '50%', flexShrink: 0 }}>
+            <UsersIcon />
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#1952d4' }}>{room.studentDisplay} present</span>
+        </div>
+
         <div className="flex-1" />
 
-        {/* Footer */}
-        <div className="mt-3 flex items-center justify-between gap-1">
-          {room.status === 'empty' && (
-            <span className="text-[8px]" style={{ color: 'rgba(107,114,128,0.7)' }}>Available</span>
-          )}
-          {room.status === 'locked' && (
-            <span className="text-[8px]" style={{ color: 'rgba(248,113,113,0.6)' }}>Restricted</span>
-          )}
-
-          {/* Copy join link — always visible so teachers can share it */}
+        <div className="flex items-center justify-between gap-3" style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid #f4f4f4' }}>
           <button
             onClick={e => { e.stopPropagation(); copyJoinLink(room.joinCode) }}
-            title="Copy student join link"
-            className="flex items-center gap-0.5 text-[8px] px-2 py-1 rounded-full font-semibold transition-all hover:opacity-100 opacity-60"
-            style={{
-              background: 'rgba(255,255,255,0.06)',
-              color: 'rgba(147,197,253,0.9)',
-              border: '1px solid rgba(147,197,253,0.18)',
-            }}>
-            🔗 Link
+            className="flex items-center"
+            style={{ background: '#fff8f0', border: '1px solid #f5ebd9', padding: '10px 18px', borderRadius: 25, gap: 10, cursor: 'pointer' }}>
+            <LinkIcon />
+            <span style={{ fontSize: 14, fontWeight: 600, color: '#b58d3d', whiteSpace: 'nowrap' }}>Copy link</span>
           </button>
 
-          {(room.status === 'live' || room.status === 'scheduled' || room.status === 'empty') && (
-            <button onClick={e => { e.stopPropagation(); onEnter(room.joinCode) }}
-              className="text-[9px] px-2.5 py-1 rounded-full font-bold transition-all ml-auto"
-              style={{
-                background: room.status === 'live' ? 'rgba(52,211,153,0.18)' : 'rgba(37,99,235,0.18)',
-                color: s.color,
-                border: `1px solid ${s.color}30`,
-              }}>
-              {room.status === 'live' ? 'Join →' : room.status === 'scheduled' ? 'Reserve' : 'Enter →'}
-            </button>
-          )}
+          <button
+            onClick={e => { e.stopPropagation(); handleEnter() }}
+            className="flex items-center"
+            style={{
+              background: locked ? 'linear-gradient(135deg,#9ca3af,#6b7280)' : 'linear-gradient(135deg,#104fe6 0%,#072d8a 100%)',
+              border: '1px solid #d4af37',
+              padding: '12px 22px',
+              borderRadius: 30,
+              gap: 10,
+              cursor: locked ? 'not-allowed' : 'pointer',
+              boxShadow: locked ? 'none' : '0 4px 15px rgba(11,59,177,0.3)',
+              opacity: locked ? 0.6 : 1,
+            }}>
+            <PlayIcon />
+            <span style={{ color: '#ffffff', fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap' }}>{locked ? 'Locked' : 'Join Room'}</span>
+            {!locked && <ArrowIcon />}
+          </button>
         </div>
       </div>
     </motion.div>
   )
 }
 
-const FILTERS: { id: RoomStatus | 'all'; label: string; emoji: string }[] = [
-  { id: 'all',       label: 'All',       emoji: '🏫' },
-  { id: 'live',      label: 'Live',      emoji: '🔴' },
-  { id: 'scheduled', label: 'Scheduled', emoji: '📅' },
-  { id: 'empty',     label: 'Available', emoji: '✅' },
-  { id: 'locked',    label: 'Locked',    emoji: '🔒' },
+const FILTERS: { id: RoomStatus | 'all'; label: string }[] = [
+  { id: 'all',       label: 'All rooms' },
+  { id: 'live',      label: 'Live' },
+  { id: 'scheduled', label: 'Scheduled' },
+  { id: 'empty',     label: 'Available' },
+  { id: 'locked',    label: 'Locked' },
 ]
 
-const PAGE_SIZE = 42
+const PAGE_SIZE = 12
 
 function deriveGradeLabel(room: ClassroomRoom): string {
   const label = room.label || room.courseName || room.level || ''
@@ -190,7 +334,7 @@ function deriveGradeLabel(room: ClassroomRoom): string {
 
 function buildRoomCards(classrooms: ClassroomRoom[]): RoomCard[] {
   if (!classrooms.length) return FALLBACK_ROOMS
-  return classrooms.map((room) => {
+  return classrooms.map((room, idx) => {
     const grade = deriveGradeLabel(room)
     const subjectLine = room.courseName || room.label || `Classroom ${room.id}`
     const teacher = room.teacherName || '—'
@@ -203,6 +347,7 @@ function buildRoomCards(classrooms: ClassroomRoom[]): RoomCard[] {
       teacherDisplay: teacher,
       studentDisplay: room.studentCount ?? 0,
       joinCode: room.roomId ?? room.id,
+      num: idx + 1,
     }
   })
 }
@@ -215,6 +360,27 @@ export function ClassroomsPage({ onEnterClassroom }: { onEnterClassroom: (id: nu
   const [rooms, setRooms] = useState<RoomCard[]>(FALLBACK_ROOMS)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  const [teacherMap, setTeacherMap] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(TEACHER_STORAGE_KEY) || '{}')
+    } catch {
+      return {}
+    }
+  })
+
+  const saveTeacher = useCallback((num: number, name: string) => {
+    setTeacherMap(prev => {
+      const next = { ...prev, [String(num)]: name }
+      try {
+        localStorage.setItem(TEACHER_STORAGE_KEY, JSON.stringify(next))
+      } catch {
+        /* storage unavailable */
+      }
+      return next
+    })
+  }, [])
 
   const loadRooms = useCallback(async () => {
     setLoading(true)
@@ -257,82 +423,100 @@ export function ClassroomsPage({ onEnterClassroom }: { onEnterClassroom: (id: nu
     return acc
   }, { live: 0, scheduled: 0, empty: 0, locked: 0 } as Record<RoomStatus, number>), [rooms])
 
-  const cardBg = 'rgba(11,22,62,0.85)'
-  const cardBorder = 'rgba(37,99,235,0.18)'
+  const cardBg = 'rgba(19,24,66,0.92)'
+  const cardBorder = 'rgba(37,99,235,0.22)'
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
+      <div className="flex items-start justify-between flex-wrap gap-4">
         <div>
-          <h2 className="text-2xl font-black text-gradient-aurora">🏫 Virtual Classrooms</h2>
-          <p className="text-sm mt-0.5" style={{ color: 'rgba(147,197,253,0.55)' }}>
-            {rooms.length} classrooms — live WebRTC rooms synced from the academic schedule
+          <h2 className="text-2xl font-black text-gradient-aurora flex items-center gap-2">
+            Virtual Classrooms
+            <span className="text-[11px] font-bold px-2 py-1 rounded-full"
+              style={{ background: 'rgba(52,211,153,0.12)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)' }}>
+              {counts.live} live now
+            </span>
+          </h2>
+          <p className="text-sm mt-1" style={{ color: 'rgba(147,197,253,0.5)' }}>
+            {rooms.length} WebRTC rooms synced from the academic schedule
           </p>
         </div>
-        <div className="flex items-center gap-4 text-xs flex-wrap">
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /><span style={{ color: 'rgba(52,211,153,0.85)' }}>{counts.live} Live</span></span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-500" /><span style={{ color: 'rgba(59,130,246,0.85)' }}>{counts.scheduled} Scheduled</span></span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-600" /><span className="text-gray-500">{counts.empty} Open</span></span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-400" /><span className="text-gray-500">{counts.locked} Locked</span></span>
+        <div className="flex items-center gap-2">
           <button onClick={loadRooms}
-            className="px-3 py-1.5 rounded-lg text-[11px] font-semibold text-sky-300 border border-sky-500/30 hover:border-sky-200 hover:text-white transition"
-            style={{ background: 'rgba(14,165,233,0.08)' }}>
-            ↻ Refresh
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition hover:bg-white/5"
+            style={{ background: cardBg, border: `1px solid ${cardBorder}`, color: 'rgba(147,197,253,0.8)' }}>
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          </button>
+          <button onClick={() => setSettingsOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-white transition"
+            style={{ background: 'linear-gradient(135deg,#2620a8,#2563eb)', border: '1px solid rgba(37,99,235,0.4)', boxShadow: '0 2px 12px rgba(37,99,235,0.3)' }}>
+            <Settings className="w-3.5 h-3.5" /> Settings
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="px-4 py-2 rounded-xl text-xs font-semibold text-amber-200 bg-amber-500/20 border border-amber-400/40">
+        <div className="px-4 py-2 rounded-xl text-xs font-semibold text-amber-200 bg-amber-500/15 border border-amber-400/30">
           ⚠ {error}. Showing last known layout.
         </div>
       )}
 
-      {/* Search + grade filter */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <input value={search} onChange={e => { setSearch(e.target.value); setPage(0) }}
-          placeholder="🔍 Search by subject, teacher or room number…"
-          className="flex-1 min-w-48 px-4 py-2.5 rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1"
-          style={{ background: cardBg, border: `1px solid ${cardBorder}` }} />
+      {/* Toolbar: search + grade + status */}
+      <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="relative flex-1 min-w-56">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+          <input value={search} onChange={e => { setSearch(e.target.value); setPage(0) }}
+            placeholder="Search subject, teacher or room number…"
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1"
+            style={{ background: cardBg, border: `1px solid ${cardBorder}` }} />
+        </div>
         <select value={gradeFilter} onChange={e => { setGradeFilter(e.target.value); setPage(0) }}
           className="px-3 py-2.5 rounded-xl text-sm text-white focus:outline-none"
           style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
           {gradeOptions.map(g => <option key={g} value={g}>{g}</option>)}
         </select>
+        <span className="ml-auto text-xs text-gray-500">{filtered.length} rooms</span>
       </div>
 
       {/* Status filter pills */}
       <div className="flex gap-2 flex-wrap items-center">
-        {FILTERS.map(f => (
-          <button key={f.id} onClick={() => { setStatusFilter(f.id); setPage(0) }}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all"
-            style={statusFilter === f.id ? {
-              background: 'linear-gradient(135deg,#2620a8,#2563eb)',
-              color: '#fff', boxShadow: '0 2px 12px rgba(37,99,235,0.35)',
-            } : {
-              background: cardBg, color: 'rgba(147,197,253,0.6)',
-              border: `1px solid ${cardBorder}`,
-            }}>
-            <span>{f.emoji}</span>{f.label}
-            {f.id !== 'all' && (
-              <span className="ml-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold"
-                style={{ background: 'rgba(255,255,255,0.10)' }}>
-                {f.id === 'live' ? counts.live : f.id === 'scheduled' ? counts.scheduled : f.id === 'empty' ? counts.empty : counts.locked}
+        {FILTERS.map(f => {
+          const active = statusFilter === f.id
+          const count = f.id === 'all' ? rooms.length : counts[f.id as RoomStatus]
+          return (
+            <button key={f.id} onClick={() => { setStatusFilter(f.id); setPage(0) }}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all"
+              style={active ? {
+                background: 'linear-gradient(135deg,#2620a8,#2563eb)',
+                color: '#fff', boxShadow: '0 2px 12px rgba(37,99,235,0.35)',
+              } : {
+                background: cardBg, color: 'rgba(147,197,253,0.6)',
+                border: `1px solid ${cardBorder}`,
+              }}>
+              {f.label}
+              <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold"
+                style={{ background: active ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.08)' }}>
+                {count}
               </span>
-            )}
-          </button>
-        ))}
-        <span className="ml-auto text-xs text-gray-600 self-center">{filtered.length} rooms</span>
+            </button>
+          )
+        })}
       </div>
 
-      {/* Grid — 6 columns max for taller, more readable cards */}
+      {/* Grid — big reference-designed cards */}
       {loading ? (
         <div className="py-20 text-center text-sm text-sky-200">Syncing live classrooms…</div>
       ) : paginated.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
           {paginated.map(r => (
-            <ClassroomCard key={`${r.id}-${r.joinCode}`} room={r} onEnter={onEnterClassroom} />
+            <ClassroomCard
+              key={`${r.id}-${r.joinCode}`}
+              room={r}
+              teacherName={teacherMap[String(r.num)] || r.teacherDisplay}
+              onTeacherChange={name => saveTeacher(r.num, name)}
+              onEnter={onEnterClassroom}
+            />
           ))}
         </div>
       ) : (
@@ -350,7 +534,7 @@ export function ClassroomsPage({ onEnterClassroom }: { onEnterClassroom: (id: nu
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-1.5 flex-wrap pt-2">
           <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-            className="px-3 py-1.5 rounded-xl text-xs transition disabled:opacity-30"
+            className="px-3 py-2 rounded-xl text-xs transition disabled:opacity-30"
             style={{ background: cardBg, color: 'rgba(147,197,253,0.7)', border: `1px solid ${cardBorder}` }}>
             ← Prev
           </button>
@@ -358,7 +542,7 @@ export function ClassroomsPage({ onEnterClassroom }: { onEnterClassroom: (id: nu
             const pageNum = totalPages <= 7 ? i : Math.max(0, Math.min(totalPages - 7, page - 3)) + i
             return (
               <button key={pageNum} onClick={() => setPage(pageNum)}
-                className="w-8 h-8 rounded-xl text-xs font-medium transition"
+                className="w-9 h-9 rounded-xl text-xs font-medium transition"
                 style={page === pageNum ? {
                   background: 'linear-gradient(135deg,#2620a8,#2563eb)', color: '#fff',
                   boxShadow: '0 2px 8px rgba(37,99,235,0.35)',
@@ -371,12 +555,15 @@ export function ClassroomsPage({ onEnterClassroom }: { onEnterClassroom: (id: nu
             )
           })}
           <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page === totalPages - 1}
-            className="px-3 py-1.5 rounded-xl text-xs transition disabled:opacity-30"
+            className="px-3 py-2 rounded-xl text-xs transition disabled:opacity-30"
             style={{ background: cardBg, color: 'rgba(147,197,253,0.7)', border: `1px solid ${cardBorder}` }}>
             Next →
           </button>
         </div>
       )}
+
+      {/* Settings sidebar */}
+      <SettingsSidebar open={settingsOpen} onClose={() => setSettingsOpen(false)} defaultTab="classroom" />
     </div>
   )
 }

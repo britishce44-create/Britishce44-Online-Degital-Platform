@@ -3,6 +3,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWebRTC } from '@/components/webrtc/webrtc-provider'
 import { PlacementsPage } from '@/pages/placements'
+import { SettingsSidebar } from '@/components/settings/settings-sidebar'
+import { ScreenStage } from '@/components/classroom/screen-stage'
 
 /* ─── types ─────────────────────────────────────────────── */
 type ResizeDir = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw'
@@ -78,6 +80,7 @@ export function MeetingRoomWindow({
   const [notes, setNotes] = useState('')
   const [mediaError, setMediaError] = useState<string | null>(null)
   const [placementTestGranted, setPlacementTestGranted] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   /* ── drag refs ── */
   const dragRef   = useRef<{ mx: number; my: number; px: number; py: number } | null>(null)
@@ -185,6 +188,18 @@ export function MeetingRoomWindow({
   /* ── main video: first remote stream, else local ── */
   const mainParticipant = remoteParticipants[0] ?? null
   const mainStream = mainParticipant?.stream ?? null
+  const sharingRemote = remoteParticipants.find(p => p.isSharing) ?? null
+  const activePresenter = isScreenSharing
+    ? { id: 'local', name: 'You', isLocal: true, isTeacher: true, stream: localStream, isMuted, isCameraOn, isSharing: true }
+    : sharingRemote
+      ? { id: sharingRemote.id, name: sharingRemote.name, stream: sharingRemote.stream, isMuted: sharingRemote.isMuted, isCameraOn: sharingRemote.isCameraOn, isSharing: true }
+      : null
+  const stageOthers = activePresenter
+    ? [
+        ...(activePresenter.id !== 'local' ? [{ id: 'local', name: 'You', isLocal: true, stream: localStream, isMuted, isCameraOn }] : []),
+        ...remoteParticipants.filter(p => p.id !== activePresenter.id).map(p => ({ id: p.id, name: p.name, stream: p.stream, isMuted: p.isMuted, isCameraOn: p.isCameraOn })),
+      ]
+    : []
 
   return (
     <motion.div
@@ -283,6 +298,14 @@ export function MeetingRoomWindow({
             <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'linear-gradient(145deg,#eef2ff,#e0e7ff,#f0f9ff)' }}>
               {/* subtle dot grid */}
               <div style={{ position: 'absolute', inset: 0, opacity: 0.35, backgroundImage: 'radial-gradient(circle,#c7d2fe 1px,transparent 1px)', backgroundSize: '20px 20px', pointerEvents: 'none' }} />
+
+              {/* Screen stage (Teams-style) */}
+              {activePresenter && (
+                <div style={{ position: 'absolute', inset: 0, zIndex: 30 }}>
+                  <ScreenStage presenter={activePresenter} others={stageOthers} isTeacher={true}
+                    onStop={activePresenter.id === 'local' ? () => toggleScreenShare() : undefined} />
+                </div>
+              )}
 
               {/* Main remote stream or placeholder */}
               {mainStream ? (
@@ -448,6 +471,9 @@ export function MeetingRoomWindow({
 
               <Sep />
 
+              {/* Settings */}
+              <CtrlBtn active={panel !== 'participants'} activeColor="#64748b" inactiveColor="#2563eb" onClick={() => setSettingsOpen(true)} title="Settings">⚙️</CtrlBtn>
+
               {/* End call */}
               <button onClick={handleClose} title="End Meeting"
                 style={{ width: 40, height: 40, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#ef4444,#dc2626)', color: '#fff', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 3px 10px rgba(239,68,68,0.35)', flexShrink: 0 }}
@@ -525,6 +551,8 @@ export function MeetingRoomWindow({
       )}
 
       {/* ── PLACEMENT TEST OVERLAY (interviewee side) ── */}
+      <SettingsSidebar open={settingsOpen} onClose={() => setSettingsOpen(false)} defaultTab="meeting" />
+
       {isInterview && !isSupervisor && placementTestGranted && (
         <div style={{
           position: 'absolute', inset: 0, zIndex: 999,

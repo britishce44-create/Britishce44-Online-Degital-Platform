@@ -72,7 +72,11 @@ function DashboardInner({ initialRoom }: { initialRoom?: number | null }) {
           const user = stored ? JSON.parse(stored) : null
           window.b44Desktop?.openMeetingWindow(id, String(user?.id || ''), user?.firstName + ' ' + user?.lastName || 'User')
         } else {
-          setClassroomOpen(id)
+          // Open the classroom in a popup window so it behaves like a dedicated
+          // meeting app; the monitors stay available while sharing.
+          const url = `${window.location.origin}${window.location.pathname}?meeting=1&room=${id}`
+          const popup = window.open(url, `b44-classroom-${id}`, 'width=1280,height=800,left=60,top=40,resizable=yes,scrollbars=yes')
+          if (!popup) setClassroomOpen(id)
         }
       }} />
       case 'users': return <UsersPage />

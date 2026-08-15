@@ -16,6 +16,9 @@ import { TeacherPanel } from './teacher-panel'
 import { PollWidget } from './poll-widget'
 import { BreakoutManager } from './breakout-manager'
 import { ResourceBrowser } from './resource-browser'
+import { SettingsSidebar } from '@/components/settings/settings-sidebar'
+import { ScreenStage } from './screen-stage'
+import { FloatingMonitor } from './floating-monitor'
 
 type WbLayout = 'whiteboard' | 'resources' | 'grid'
 
@@ -44,6 +47,7 @@ export function ClassroomInterior({ roomId, onClose, dir = 'ltr' }: ClassroomInt
   const [fullscreenTile, setFullscreenTile] = useState<string | null>(null)
   const [wbLayout, setWbLayout] = useState<WbLayout>('whiteboard')
   const [showBreakoutManager, setShowBreakoutManager] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
   const [recordingQuality] = useState('1080p')
@@ -105,6 +109,14 @@ export function ClassroomInterior({ roomId, onClose, dir = 'ltr' }: ClassroomInt
     })
     return list
   }, [user, userName, localStream, remoteParticipants, isMuted, isCameraOn, handRaised])
+
+  const remoteSharer = remoteParticipants.find(p => p.isSharing) ?? null
+  const activePresenter = isScreenSharing
+    ? { id: 'local', name: userName, isTeacher, isLocal: true, stream: localStream, isMuted, isCameraOn, isSharing: true }
+    : remoteSharer
+      ? { id: remoteSharer.id, name: remoteSharer.name, role: remoteSharer.role, stream: remoteSharer.stream, isMuted: remoteSharer.isMuted, isCameraOn: remoteSharer.isCameraOn, isSharing: true }
+      : null
+  const stageOthers = activePresenter ? allParticipants.filter(p => p.id !== activePresenter.id) : []
 
   const handleSendMessage = useCallback((text: string) => {
     const id = String(chatIdCounter.current++)
@@ -222,6 +234,8 @@ export function ClassroomInterior({ roomId, onClose, dir = 'ltr' }: ClassroomInt
             className={`p-1.5 rounded-full transition text-sm ${sideTab === 'participants' ? 'bg-indigo-500/20 text-indigo-300' : 'text-gray-500 hover:text-white hover:bg-white/10'}`}>
             👥
           </button>
+          <button onClick={() => setSettingsOpen(true)}
+            className="p-1.5 rounded-full transition text-sm text-gray-500 hover:text-white hover:bg-white/10" title="Settings">⚙️</button>
           <button onClick={onClose}
             className="p-1.5 rounded-full hover:bg-red-500/20 text-red-400/60 hover:text-red-300 transition text-xs">✕</button>
         </div>
@@ -245,7 +259,7 @@ export function ClassroomInterior({ roomId, onClose, dir = 'ltr' }: ClassroomInt
       )}
 
       {/* ── MONITOR STRIP (always at top, hidden in Resources mode for full space) ── */}
-      {wbLayout !== 'resources' && (
+      {wbLayout !== 'resources' && !activePresenter && (
         !stripCollapsed ? (
           <MonitorStrip
             participants={allParticipants}
@@ -269,7 +283,15 @@ export function ClassroomInterior({ roomId, onClose, dir = 'ltr' }: ClassroomInt
 
       {/* ── Main content ── */}
       <div className="flex flex-1 overflow-hidden min-h-0">
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+
+          {/* ── SCREEN STAGE (Teams-style, covers board/grid/resources) ── */}
+          {activePresenter && (
+            <div className="absolute inset-0 z-20">
+              <ScreenStage presenter={activePresenter} others={stageOthers} isTeacher={isTeacher}
+                onStop={activePresenter.isLocal ? toggleScreenShare : undefined} />
+            </div>
+          )}
 
           {/* Strip collapse control for teacher */}
           {isTeacher && !stripCollapsed && (
@@ -428,6 +450,15 @@ export function ClassroomInterior({ roomId, onClose, dir = 'ltr' }: ClassroomInt
       <TimerPopup isOpen={showTimer} onClose={() => setShowTimer(false)} />
       <ComponentModal isOpen={showModal} onClose={() => setShowModal(false)} />
       <MonkeyBot isOpen={showMonkey} onClose={() => setShowMonkey(false)} />
+      <SettingsSidebar open={settingsOpen} onClose={() => setSettingsOpen(false)} defaultTab="classroom" />
+
+      {/* Always-on-top participant monitors while screen sharing (PiP window) */}
+      <FloatingMonitor
+        active={!!activePresenter}
+        participants={allParticipants.map(p => ({ id: p.id, name: p.name, stream: p.stream ?? null, isLocal: !!p.isLocal }))}
+        localStream={localStream}
+        localName={userName}
+      />
     </div>
   )
 }

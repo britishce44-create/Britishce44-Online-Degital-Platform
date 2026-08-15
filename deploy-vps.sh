@@ -6,7 +6,7 @@
 set -euo pipefail
 
 # ─── CONFIGURE THESE ─────────────────────────────────────
-DOMAIN="violet-finch-872010.hostingersite.com"
+DOMAIN="platform.britishce4.com"
 #                   ↑ Change to your custom domain if you have one
 ROOT_DIR="/opt/britishce44"
 API_PORT=5000
@@ -37,7 +37,7 @@ echo "[2/7] Installing Node.js + pnpm..."
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt install -y -qq nodejs
 npm install -g pnpm pm2
-echo "  OK  Node.js $(node -V) + pnpm $(pnpm -V)"
+echo "  OK  Node.js $(node -V) + pnpm $(pnpm -v)"
 
 # ─── Step 3: Project ───────────────────────────────────
 echo "[3/7] Setting up project directory..."
@@ -149,6 +149,11 @@ done
 
 # ─── Step 6: Build & Start ─────────────────────────────
 echo "[6/7] Building & starting..."
+
+# Load backend env into current shell so child processes see DATABASE_URL
+set -a
+. artifacts/api-server/.env
+set +a
 
 # Push DB schema
 pnpm --filter @workspace/db run push

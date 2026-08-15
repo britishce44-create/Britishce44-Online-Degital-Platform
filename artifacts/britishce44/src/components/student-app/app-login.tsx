@@ -7,7 +7,7 @@ interface Props {
 }
 
 export function AppLogin({ prefill, onComplete }: Props) {
-  const { setStudent, syncSchedule, refreshConfig } = useAppState()
+  const { setStudent, syncSchedule, syncAssignments, refreshConfig } = useAppState()
   const [name, setName] = useState(prefill?.name || '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -44,7 +44,7 @@ export function AppLogin({ prefill, onComplete }: Props) {
         }
         setStudent(student)
         localStorage.setItem('b44_app_token', data.accessToken)
-        syncSchedule(); refreshConfig(); onComplete()
+        syncSchedule(); syncAssignments(); refreshConfig(); onComplete()
         return
       }
 

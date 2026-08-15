@@ -8,14 +8,15 @@ interface Props {
 }
 
 export function AppDashboard({ onNavigate }: Props) {
-  const { student, classes, notifications, unreadCount, online, syncSchedule, refreshConfig } = useAppState()
+  const { student, classes, notifications, unreadCount, online, syncSchedule, syncAssignments, refreshConfig } = useAppState()
 
   useEffect(() => {
     syncSchedule()
+    syncAssignments()
     refreshConfig()
-    const interval = setInterval(() => { syncSchedule(); refreshConfig() }, 60000)
+    const interval = setInterval(() => { syncSchedule(); syncAssignments(); refreshConfig() }, 60000)
     return () => clearInterval(interval)
-  }, [syncSchedule, refreshConfig])
+  }, [syncSchedule, syncAssignments, refreshConfig])
 
   const nextClass = classes
     .filter(c => new Date(`${c.date}T${c.startTime}`) > new Date())

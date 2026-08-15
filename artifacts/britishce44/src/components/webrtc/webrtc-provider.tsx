@@ -33,6 +33,11 @@ export interface RemoteParticipant {
   stream?: MediaStream;
   isMuted?: boolean;
   isCameraOn?: boolean;
+  isSharing?: boolean;
+  isVisible?: boolean;
+  status?: 'expected' | 'active' | 'inactive' | 'disconnected' | 'removed' | 'transferred';
+  isPresenter?: boolean;
+  permissions?: Record<string, string>;
 }
 
 interface BreakoutInfo {
@@ -60,6 +65,18 @@ interface WebRTCContextValue {
   leaveBreakout: () => Promise<void>;
   refreshBreakouts: () => void;
   restartIce: () => Promise<void>;
+  // Invisibility mode for admin/supervisor
+  isInvisible: boolean;
+  setInvisible: (invisible: boolean) => void;
+  toggleInvisible: () => void;
+  // Classroom Assignment Events
+  setParticipantStatus: (participantId: string, status: string) => void;
+  forcePermission: (participantId: string, feature: string, action: string) => void;
+  assignPresenter: (participantId: string) => void;
+  removePresenter: (participantId: string) => void;
+  moveParticipant: (participantId: string, toClassroomId: number, isTemporary?: boolean, reason?: string) => void;
+  transferToRoom1: (participantId: string, reason?: string) => void;
+  lockClassroom: (locked: boolean, reason?: string) => void;
 }
 
 const WebRTCContext = createContext<WebRTCContextValue | null>(null);
@@ -73,6 +90,8 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
   const [breakouts, setBreakouts] = useState<BreakoutInfo[]>([]);
   const [currentBreakoutId, setCurrentBreakoutId] = useState<string | null>(null);
+  // Invisibility mode for admin/supervisor
+  const [isInvisible, setIsInvisible] = useState(false);
 
   const localStreamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
@@ -80,6 +99,10 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
   const pcsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const pendingCandidatesRef = useRef<Map<string, RTCIceCandidateInit[]>>(new Map());
   const breakoutIdRef = useRef(0);
+  const roleRef = useRef<string>('student');
+  const roomIdRef = useRef<number | null>(null);
+  const userIdRef = useRef<string>('');
+  const nameRef = useRef<string>('');
 
   const updateParticipant = useCallback(
     (socketId: string, patch: Partial<RemoteParticipant>) => {
@@ -165,6 +188,26 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
     async (roomId: number, userId: string, name: string) => {
       cleanup();
 
+      roleRef.current = 'student';
+      roomIdRef.current = roomId;
+      userIdRef.current = userId;
+      nameRef.current = name;
+
+      const stored = localStorage.getItem("b44_user");
+      const role = stored ? (JSON.parse(stored).role ?? "student") : "student";
+      roleRef.current = role;
+
+      // For admin/supervisor, start invisible by default
+      if (role === 'admin' || role === 'supervisor') {
+        setIsInvisible(true);
+      }
+
+      // If invisible, don't get media or join the WebRTC mesh
+      if (isInvisible) {
+        setIsConnected(true);
+        return;
+      }
+
       let stream: MediaStream | null = null;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
@@ -182,9 +225,6 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
       setLocalStream(stream);
       setIsCameraOn((stream?.getVideoTracks().length ?? 0) > 0);
       setIsMuted(false);
-
-      const stored = localStorage.getItem("b44_user");
-      const role = stored ? (JSON.parse(stored).role ?? "student") : "student";
 
       const signalingUrl = (import.meta.env.VITE_SIGNALING_URL as string) || window.location.origin;
       const socket = io(signalingUrl, {
@@ -239,6 +279,7 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
               userId: p.userId,
               name: p.name,
               role: p.role,
+              isVisible: true,
             })),
           );
           peers.forEach((p) => makeOffer(p.socketId));
@@ -262,6 +303,7 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
                 userId: peer.userId,
                 name: peer.name,
                 role: peer.role,
+                isVisible: true,
               },
             ];
           });
@@ -343,23 +385,188 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
           socketId,
           muted,
           cameraOn,
+          screenShare,
         }: {
           socketId: string;
           muted: boolean;
           cameraOn: boolean;
+          screenShare?: boolean;
         }) => {
-          updateParticipant(socketId, { isMuted: muted, isCameraOn: cameraOn });
+          updateParticipant(socketId, {
+            isMuted: muted,
+            isCameraOn: cameraOn,
+            isSharing: screenShare ?? false,
+          });
         },
       );
-    },
-    [cleanup, createPC, makeOffer, updateParticipant],
+
+      /* ── Classroom Assignment Events ── */
+
+      // Participant joined (from assignment system)
+      socket.on("participant-joined", (data: { socketId: string; userId: string; name: string; role: string; status: string }) => {
+        setRemoteParticipants((prev) => {
+          if (prev.some((p) => p.id === data.socketId)) return prev;
+          return [
+            ...prev,
+            {
+              id: data.socketId,
+              userId: data.userId,
+              name: data.name,
+              role: data.role,
+              isVisible: true,
+              status: data.status as any,
+            },
+          ];
+        });
+      });
+
+      // Participant left
+      socket.on("participant-left", (data: { socketId: string }) => {
+        pcsRef.current.get(data.socketId)?.close();
+        pcsRef.current.delete(data.socketId);
+        setRemoteParticipants((prev) => prev.filter((p) => p.id !== data.socketId));
+      });
+
+      // Participant status changed (inactive/active/expected)
+      socket.on("participant-status-changed", (data: { participantId: string; status: string }) => {
+        setRemoteParticipants((prev) =>
+          prev.map((p) => (p.id === data.participantId ? { ...p, status: data.status as any } : p))
+        );
+      });
+
+      // Permission changed (force mic/camera/other)
+      socket.on("permission-changed", (data: { participantId: string; feature: string; action: string }) => {
+        setRemoteParticipants((prev) =>
+          prev.map((p) => {
+            if (p.id !== data.participantId) return p;
+            const perms = { ...(p.permissions || {}) };
+            perms[data.feature] = data.action;
+            return { ...p, permissions: perms };
+          })
+        );
+      });
+
+      // Presenter assigned
+      socket.on("presenter-assigned", (data: { participantId: string }) => {
+        setRemoteParticipants((prev) =>
+          prev.map((p) => (p.id === data.participantId ? { ...p, isPresenter: true } : p))
+        );
+      });
+
+      // Presenter removed
+      socket.on("presenter-removed", (data: { participantId: string }) => {
+        setRemoteParticipants((prev) =>
+          prev.map((p) => (p.id === data.participantId ? { ...p, isPresenter: false } : p))
+        );
+      });
+
+      // Participant moved to another classroom
+      socket.on("participant-moved", (data: { participantId: string; toClassroomId: number; fromClassroomId?: number; isTemporary?: boolean; reason?: string }) => {
+        // If it's our classroom, the participant will be removed
+        // The UI should handle the transition
+        if (data.fromClassroomId === roomIdRef.current) {
+          setRemoteParticipants((prev) => prev.filter((p) => p.id !== data.participantId));
+        }
+      });
+
+      // Classroom locked
+      socket.on("classroom-locked", (data: { locked: boolean; reason?: string }) => {
+        // Handle classroom lock state
+        console.log("[Classroom] Lock state changed:", data);
+      });
+      },
+    [cleanup, createPC, makeOffer, updateParticipant, isInvisible],
   );
 
   const leaveClassroom = useCallback(async () => {
     cleanup();
     setBreakouts([]);
     setCurrentBreakoutId(null);
+    setIsInvisible(false);
   }, [cleanup]);
+
+  // Invisibility mode for admin/supervisor
+  const setInvisible = useCallback((invisible: boolean) => {
+    setIsInvisible(invisible);
+    if (!invisible && roomIdRef.current && userIdRef.current && nameRef.current) {
+      // Re-join the classroom when becoming visible
+      joinClassroom(roomIdRef.current, userIdRef.current, nameRef.current);
+    } else if (invisible) {
+      // Leave the classroom when becoming invisible
+      cleanup();
+      setIsConnected(true); // Keep connected state for UI
+    }
+  }, [joinClassroom, cleanup]);
+
+  const toggleInvisible = useCallback(() => {
+    setInvisible(!isInvisible);
+  }, [isInvisible, setInvisible]);
+
+  /* ── Classroom Assignment Event Emitters ── */
+
+  const setParticipantStatus = useCallback((participantId: string, status: string) => {
+    if (!roomIdRef.current) return;
+    socketRef.current?.emit("participant-status", {
+      classroomId: roomIdRef.current,
+      participantId,
+      status,
+    });
+  }, []);
+
+  const forcePermission = useCallback((participantId: string, feature: string, action: string) => {
+    if (!roomIdRef.current) return;
+    socketRef.current?.emit("force-permission", {
+      classroomId: roomIdRef.current,
+      participantId,
+      feature,
+      action,
+    });
+  }, []);
+
+  const assignPresenter = useCallback((participantId: string) => {
+    if (!roomIdRef.current) return;
+    socketRef.current?.emit("assign-presenter", {
+      classroomId: roomIdRef.current,
+      participantId,
+    });
+  }, []);
+
+  const removePresenter = useCallback((participantId: string) => {
+    if (!roomIdRef.current) return;
+    socketRef.current?.emit("remove-presenter", {
+      classroomId: roomIdRef.current,
+      participantId,
+    });
+  }, []);
+
+  const moveParticipant = useCallback((participantId: string, toClassroomId: number, isTemporary = true, reason?: string) => {
+    if (!roomIdRef.current) return;
+    socketRef.current?.emit("move-participant", {
+      classroomId: roomIdRef.current,
+      participantId,
+      toClassroomId,
+      isTemporary,
+      reason,
+    });
+  }, []);
+
+  const transferToRoom1 = useCallback((participantId: string, reason?: string) => {
+    if (!roomIdRef.current) return;
+    socketRef.current?.emit("transfer-to-room1", {
+      classroomId: roomIdRef.current,
+      participantId,
+      reason,
+    });
+  }, []);
+
+  const lockClassroom = useCallback((locked: boolean, reason?: string) => {
+    if (!roomIdRef.current) return;
+    socketRef.current?.emit("classroom-lock", {
+      classroomId: roomIdRef.current,
+      locked,
+      reason,
+    });
+  }, []);
 
   const toggleMic = useCallback(() => {
     const stream = localStreamRef.current;
@@ -368,8 +575,8 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
     track.enabled = !track.enabled;
     const newMuted = !track.enabled;
     setIsMuted(newMuted);
-    socketRef.current?.emit("media-state", { muted: newMuted, cameraOn: isCameraOn });
-  }, [isCameraOn]);
+    socketRef.current?.emit("media-state", { muted: newMuted, cameraOn: isCameraOn, screenShare: isScreenSharing });
+  }, [isCameraOn, isScreenSharing]);
 
   const toggleCamera = useCallback(() => {
     const stream = localStreamRef.current;
@@ -378,8 +585,8 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
     track.enabled = !track.enabled;
     const newCameraOn = track.enabled;
     setIsCameraOn(newCameraOn);
-    socketRef.current?.emit("media-state", { muted: isMuted, cameraOn: newCameraOn });
-  }, [isMuted]);
+    socketRef.current?.emit("media-state", { muted: isMuted, cameraOn: newCameraOn, screenShare: isScreenSharing });
+  }, [isMuted, isScreenSharing]);
 
   const toggleScreenShare = useCallback(async () => {
     if (isScreenSharing) {
@@ -391,6 +598,7 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
         if (sender && cam) sender.replaceTrack(cam).catch(() => {});
       });
       setIsScreenSharing(false);
+      socketRef.current?.emit("media-state", { muted: isMuted, cameraOn: isCameraOn, screenShare: false });
     } else {
       try {
         const screen = await navigator.mediaDevices.getDisplayMedia({
@@ -402,6 +610,7 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
         videoTrack.onended = () => {
           screenStreamRef.current = null;
           setIsScreenSharing(false);
+          socketRef.current?.emit("media-state", { muted: isMuted, cameraOn: isCameraOn, screenShare: false });
           const cam = localStreamRef.current?.getVideoTracks()[0] ?? null;
           pcsRef.current.forEach((pc) => {
             const sender = pc.getSenders().find((s) => s.track?.kind === "video");
@@ -413,11 +622,12 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
           if (sender) sender.replaceTrack(videoTrack).catch(() => {});
         });
         setIsScreenSharing(true);
+        socketRef.current?.emit("media-state", { muted: isMuted, cameraOn: isCameraOn, screenShare: true });
       } catch {
         /* user cancelled */
       }
     }
-  }, [isScreenSharing]);
+  }, [isScreenSharing, isMuted, isCameraOn]);
 
   const createBreakout = useCallback(
     async (name: string): Promise<string> => {
@@ -491,6 +701,18 @@ export function WebRTCProvider({ children }: { children: ReactNode }) {
         leaveBreakout,
         refreshBreakouts,
         restartIce,
+        // Invisibility mode for admin/supervisor
+        isInvisible,
+        setInvisible,
+        toggleInvisible,
+        // Classroom Assignment Events
+        setParticipantStatus,
+        forcePermission,
+        assignPresenter,
+        removePresenter,
+        moveParticipant,
+        transferToRoom1,
+        lockClassroom,
       }}
     >
       {children}

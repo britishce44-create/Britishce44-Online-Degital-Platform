@@ -428,7 +428,7 @@ router.post("/v1/classroom-assessment/reports/:id/generate-pdf", async (req, res
 // Powers the Student App schedule + live-class join.
 router.get("/v1/classroom-assessment/schedule", async (req, res) => {
   const user = getReqUser(req);
-  if (!user) return res.json({ classes: [] });
+  if (!user) return res.status(403).json({ message: "Forbidden" });
 
   // Resolve the student record from the linked app_user
   let studentRecord: typeof students.$inferSelect | null = null;
@@ -496,8 +496,9 @@ function nextDateForWeekday(wd: number): string {
 /* ── Classrooms CRUD: real DB-backed rooms (replaces synthetic buildRooms) ─ */
 
 router.get("/v1/classrooms", async (req, res) => {
-  // Public list: room directory metadata only (no per-user data), so it must
-  // never 403 on a missing/expired token. Mutating routes below stay admin-gated.
+  const user = getReqUser(req);
+  if (!user) return res.status(403).json({ message: "Forbidden" });
+
   const rooms = await db.select().from(classrooms).orderBy(classrooms.id);
   const out = [];
   for (const r of rooms) {

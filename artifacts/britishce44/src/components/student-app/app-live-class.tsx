@@ -1,12 +1,30 @@
 import { useState, useMemo } from 'react'
 import { useAppState } from './app-provider'
 
+function isAssignmentActive(a: {
+  schedule: { startTime: string; endTime: string; days: number[] | null; frequency: string } | null
+  earlyLoginAllowance: number
+}): boolean {
+  const sched = a.schedule
+  if (!sched) return true // no schedule => always joinable (permanent assignment)
+  const now = new Date()
+  const todayDow = now.getDay() // 0=Sun..6=Sat
+  if (sched.days && sched.days.length && !sched.days.includes(todayDow)) return false
+  const [sh, sm] = sched.startTime.split(':').map(Number)
+  const [eh, em] = sched.endTime.split(':').map(Number)
+  const start = sh * 60 + (sm || 0)
+  const end = eh * 60 + (em || 0)
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const early = Math.max(0, a.earlyLoginAllowance || 0)
+  return nowMin >= start - early && nowMin <= end
+}
+
 export function AppLiveClass() {
-  const { student, classes, online } = useAppState()
+  const { student, classes, assignments, online } = useAppState()
   const [micOn, setMicOn] = useState(false)
   const [camOn, setCamOn] = useState(false)
 
-  // Find the currently-active class (today, within start–end time)
+  // Find the currently-active scheduled class (today, within start–end time)
   const activeClass = useMemo(() => {
     const now = new Date()
     const today = now.toISOString().split('T')[0]
@@ -21,10 +39,17 @@ export function AppLiveClass() {
     })
   }, [classes])
 
-  // The room to join: active class room (numeric), or the student's assigned room
+  // Find the active classroom assignment (authoritative source for permitted rooms)
+  const activeAssignment = useMemo(
+    () => assignments.find(a => a.status === 'active' && isAssignmentActive(a)) || null,
+    [assignments]
+  )
+
+  // The room to join: active assignment room first, then active scheduled class,
+  // then the student's assigned room number.
   const joinRoom = (() => {
+    if (activeAssignment?.roomId && activeAssignment.roomId > 0) return activeAssignment.roomId
     if (activeClass) {
-      // Prefer courseId as the numeric room ID for the join URL
       if (activeClass.courseId) return activeClass.courseId
       const r = Number(activeClass.room)
       if (!isNaN(r) && r > 0) return r
@@ -65,7 +90,15 @@ export function AppLiveClass() {
             {student?.name?.charAt(0) || '?'}
           </div>
           <p className="text-white font-bold text-lg">{student?.name || 'Student'}</p>
-          {activeClass ? (
+          {activeAssignment ? (
+            <div className="text-center mt-2">
+              <p className="text-indigo-300 text-sm">{activeAssignment.classroomLabel || `Classroom ${activeAssignment.classroomId}`}</p>
+              <p className="text-indigo-300/70 text-xs">Room {activeAssignment.roomId}</p>
+              {activeAssignment.schedule && (
+                <p className="text-indigo-300/50 text-xs">{activeAssignment.schedule.startTime}–{activeAssignment.schedule.endTime}</p>
+              )}
+            </div>
+          ) : activeClass ? (
             <div className="text-center mt-2">
               <p className="text-indigo-300 text-sm">{activeClass.name}</p>
               <p className="text-indigo-300/70 text-xs">{activeClass.teacher} · Room {activeClass.room}</p>
@@ -98,7 +131,7 @@ export function AppLiveClass() {
             onClick={joinLiveClass}
             className="w-full py-3 rounded-xl text-sm font-bold text-white transition active:scale-95"
             style={{ background: 'linear-gradient(135deg,#3FBAEB,#2563eb)', boxShadow: '0 4px 16px rgba(63,186,235,0.3)' }}>
-            {activeClass ? '🔴 Join Live Class →' : 'Enter Classroom →'}
+            {activeAssignment || activeClass ? '🔴 Join Live Class →' : 'Enter Classroom →'}
           </button>
         </div>
       )}
@@ -123,7 +156,7 @@ export function AppLiveClass() {
       </div>
 
       <p className="text-center text-[10px] text-gray-500 px-4 pb-2">
-        {activeClass
+        {activeAssignment || activeClass
           ? 'Your class is live now. Tap "Join Live Class" to enter the full classroom with video, audio, and chat.'
           : 'Join a scheduled class from the Schedule tab when it\'s time. The full classroom opens with video, audio, and chat.'}
       </p>

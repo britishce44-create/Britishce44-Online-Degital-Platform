@@ -1,6 +1,6 @@
 
 import { WebRTCProvider } from '../webrtc/webrtc-provider';
-import { ClassroomInterior } from './classroom-interior';
+import { ClassroomInterior } from './ClassroomInteriorNew';
 
 interface ClassroomRoomProps {
   roomId: number;
