@@ -9,15 +9,13 @@ export const LiveVideoPanel: React.FC<LiveVideoPanelProps> = ({ participants = [
   const [isPoppedOut, setIsPoppedOut] = useState(false);
 
   const handlePopOut = async () => {
-    // Check for Picture-in-Picture / Document Pip API support
     if ('documentPictureInPicture' in window) {
       try {
         const pipWindow = await (window as any).documentPictureInPicture.requestWindow({
           width: 800,
-          height: 200,
+          height: 220,
         });
 
-        // Copy styles to pop-out window
         [...document.styleSheets].forEach((styleSheet) => {
           try {
             const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join('');
@@ -34,7 +32,6 @@ export const LiveVideoPanel: React.FC<LiveVideoPanelProps> = ({ participants = [
           }
         });
 
-        // Container element inside pop-out window
         const container = pipWindow.document.createElement('div');
         container.id = 'pip-video-root';
         container.className = 'bg-[#111827] text-white p-4 h-full flex items-center gap-4 overflow-x-auto';
@@ -49,19 +46,17 @@ export const LiveVideoPanel: React.FC<LiveVideoPanelProps> = ({ participants = [
         console.error('Pop-out error:', err);
       }
     } else {
-      // Fallback popup window if Document PiP is unsupported
       window.open(
         '/classroom/participants-popout',
         'ParticipantsPanel',
-        'width=900,height=220,resizable=yes,scrollbars=no'
+        'width=900,height=240,resizable=yes,scrollbars=no'
       );
     }
   };
 
   return (
-    <div className="w-full bg-[#111827] border-b border-gray-800 text-white flex flex-col justify-between p-3 min-h-[140px] shrink-0 relative z-10">
-      {/* Top Header Bar */}
-      <div className="flex items-center justify-between pb-2 text-xs text-gray-300 font-medium border-b border-gray-800/60">
+    <div className="w-full bg-[#111827] border-b border-gray-800 text-white flex flex-col justify-between p-3 h-[180px] shrink-0 relative z-10 transition-all duration-200">
+      <div className="flex items-center justify-between pb-1.5 text-xs text-gray-300 font-medium border-b border-gray-800/60 shrink-0">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span>Live Video Panel ({participants.length || 1} connected)</span>
@@ -76,11 +71,9 @@ export const LiveVideoPanel: React.FC<LiveVideoPanelProps> = ({ participants = [
         </button>
       </div>
 
-      {/* Video Cards Stream Container */}
       {!isPoppedOut ? (
-        <div className="flex items-center gap-3 pt-2 overflow-x-auto custom-scrollbar min-h-[90px]">
-          {/* Main User Video Box */}
-          <div className="relative w-32 h-20 bg-gray-900 rounded-lg border border-gray-700 overflow-hidden shrink-0 flex items-center justify-center">
+        <div className="flex items-center gap-3 pt-2 overflow-x-auto custom-scrollbar h-[130px] shrink-0">
+          <div className="relative w-40 h-28 bg-gray-900 rounded-lg border border-gray-700 overflow-hidden shrink-0 flex items-center justify-center">
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent z-10" />
             <div className="flex flex-col items-center text-gray-400">
               <Camera className="w-6 h-6 mb-1 opacity-60" />
@@ -91,11 +84,10 @@ export const LiveVideoPanel: React.FC<LiveVideoPanelProps> = ({ participants = [
             </span>
           </div>
 
-          {/* Participant Slots */}
           {participants.map((p) => (
             <div
               key={p.id}
-              className="relative w-32 h-20 bg-gray-800/80 rounded-lg border border-gray-700 overflow-hidden shrink-0 flex items-center justify-center"
+              className="relative w-40 h-28 bg-gray-800/80 rounded-lg border border-gray-700 overflow-hidden shrink-0 flex items-center justify-center"
             >
               <span className="text-xs font-semibold text-gray-300">{p.name}</span>
               {p.isMuted && (
